@@ -99,7 +99,7 @@ void CPURandomSampler::CSRRowWiseSample(
     const int64_t* row_ptr,
     const int64_t* col_idx,
     int64_t* out_nbrs) {
-  at::parallel_for(0, bs, 1, [&](int32_t start, int32_t end){
+  at::parallel_for(0, bs, 1, [&](int32_t start, int32_t end) {
     for(int32_t i = start; i < end; ++i) {
       auto v = nodes[i];
       if (v < row_count) {

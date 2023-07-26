@@ -4,8 +4,9 @@ set(CMAKE_CXX_STANDARD 14)
 
 option(DEBUG "Enable debug mode" OFF)
 option(BUILD_TESTS "Enable testing" ON)
-option(WITH_CUDA "Enable CUDA support" ON)
+option(WITH_CUDA "Enable CUDA support" OFF)
 option(WITH_VINEYARD "Enable vineyard support" OFF)
+option(WITH_GART "Enable GART support" ON)
 
 set(GLT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 set(GLT_CSRC_DIR ${GLT_ROOT}/graphlearn_torch/csrc)
@@ -103,9 +104,17 @@ if(WITH_CUDA)
   target_source_tree(graphlearn_torch
     ${GLT_CSRC_DIR}/cuda/*.cu)
 endif()
+if(WITH_GART)
+  target_source_tree(graphlearn_torch
+    ${GLT_CSRC_DIR}/grin/*.cc)
+endif()
 
 target_include_directories(graphlearn_torch
-  PUBLIC ${GLT_ROOT})
+  PUBLIC ${GLT_ROOT}/include)
+if(WITH_GART)
+  target_include_directories(graphlearn_torch
+    PUBLIC ${GLT_ROOT}/include/grin)
+endif()
 target_link_libraries(graphlearn_torch
   PUBLIC Python3::Python ${TORCH_LIBRARIES})
 
@@ -118,7 +127,17 @@ if(WITH_VINEYARD)
     PRIVATE ${VINEYARD_INCLUDE_DIRS})
   target_link_libraries(graphlearn_torch
     PUBLIC ${VINEYARD_LIBRARIES})
+  target_include_directories(graphlearn_torch
+    PRIVATE ${GLT_THIRD_PARTY_DIR}/grin/storage/v6d)
 endif()
+
+if(WITH_GART)
+  target_include_directories(graphlearn_torch
+    PRIVATE ${GLT_THIRD_PARTY_DIR}/grin/storage/GART)
+endif()
+
+target_include_directories(graphlearn_torch
+  PRIVATE ${GLT_THIRD_PARTY_DIR})
 
 # Build tests
 if(BUILD_TESTS)

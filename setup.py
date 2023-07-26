@@ -24,8 +24,10 @@ _VERSION = '0.2.1'
 
 RELEASE = os.getenv("RELEASE", "FALSE")
 ROOT_PATH = os.path.abspath(os.path.join(os.getcwd()))
+print("ROOT_PATH: ", ROOT_PATH)
 WITH_VINEYARD = os.getenv('WITH_VINEYARD', 'OFF')
-WITH_CUDA = os.getenv('WITH_CUDA', 'ON')
+WITH_CUDA = os.getenv('WITH_CUDA', 'OFF')
+WITH_GART = os.getenv('WITH_GART', 'OFF')
 
 extensions = []
 include_dirs=[]
@@ -58,12 +60,19 @@ if WITH_VINEYARD == 'ON':
   libraries.append('vineyard_graph')
   libraries.append('vineyard_io')
 
+if WITH_GART == 'ON':
+  include_dirs.append(ROOT_PATH + '/third_party')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/storage/GART')
+
 
 extra_cxx_flags.append('-D_GLIBCXX_USE_CXX11_ABI=0')
-extra_cxx_flags.append('-std=gnu++14')
+extra_cxx_flags.append('-std=gnu++17')
 
 sources = ['graphlearn_torch/python/py_export.cc']
 sources += glob.glob('graphlearn_torch/csrc/**/**.cc', recursive=True)
+
+if WITH_GART == 'ON':
+  sources += glob.glob('graphlearn_torch/csrc/**/**/**.cc', recursive=True)
 
 if WITH_CUDA == 'ON':
   sources += glob.glob('graphlearn_torch/csrc/**/**.cu', recursive=True)
@@ -77,6 +86,11 @@ if WITH_CUDA == 'ON':
   define_macros.append(('WITH_CUDA', 'ON'))
 else:
   undef_macros.append(('WITH_CUDA'))
+
+if WITH_GART == 'ON':
+  define_macros.append(('WITH_GART', 'ON'))
+else:
+  undef_macros.append(('WITH_GART'))
 
 if RELEASE == 'TRUE':
   nvcc_flags = ['-O3', '--expt-extended-lambda', '-lnuma',
