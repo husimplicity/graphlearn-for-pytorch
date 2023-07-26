@@ -32,6 +32,11 @@ limitations under the License.
 #include "graphlearn_torch/include/types.h"
 #include "graphlearn_torch/include/vineyard_utils.h"
 
+#ifdef WITH_VINEYARD
+#include "graphlearn_torch/include/grin/grin_graph.h"
+#include "graphlearn_torch/include/grin/grin_feature.h"
+#endif
+
 #ifdef WITH_CUDA
 #include "graphlearn_torch/csrc/cuda/inducer.cuh"
 #include "graphlearn_torch/csrc/cuda/random_negative_sampler.cuh"
@@ -91,12 +96,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def("get_col_count", &GrinGraph::GetColCount)
     .def("get_src_type_name", &GrinGraph::GetSrcTypeName)
     .def("get_dst_type_name", &GrinGraph::GetDstTypeName)
-    .def("get_edge_type_name", &GrinGraph::GetEdgeTypeName)
+    .def("get_edge_type_name", &GrinGraph::GetEdgeTypeName);
 
   py::class_<GrinVertexFeature>(m, "GrinVertexFeature")
     .def(py::init<const char*, const std::string&>())
     .def("cpu_get", &GrinVertexFeature::cpu_get,
-         py::arg("ex_ids"));
+         py::arg("ex_ids"))
     .def("get_labels", &GrinVertexFeature::get_labels,
          py::arg("ex_ids"));
   

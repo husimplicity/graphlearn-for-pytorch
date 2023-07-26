@@ -48,6 +48,9 @@ if WITH_VINEYARD == 'ON':
   include_dirs.append('/usr/local/include' + '/vineyard')
   include_dirs.append('/usr/local/include' + '/vineyard/contrib')
   include_dirs.append('/home/pai/include')
+  include_dirs.append(ROOT_PATH + '/third_party')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/storage/v6d')
+  include_dirs.append('/usr/lib/x86_64-linux-gnu/openmpi/include')
 
   library_dirs.append('/usr/local/lib')
   library_dirs.append('/home/pai/lib')

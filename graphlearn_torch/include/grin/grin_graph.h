@@ -89,6 +89,16 @@ public:
     return grin_get_edge_type_name(graph_, edge_type_);
   }
 
+  int64_t GetEdgeCount() const {
+    // TODO(wanglei)
+    return 0;
+  }
+
+
+  int64_t GetColCount() const {
+    return 0;
+  }
+
 private:
   friend class GrinRandomSampler;
   GRIN_PARTITIONED_GRAPH  partitioned_graph_;
