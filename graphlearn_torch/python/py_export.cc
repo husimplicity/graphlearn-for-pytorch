@@ -37,6 +37,11 @@ limitations under the License.
 #include "graphlearn_torch/include/grin/grin_feature.h"
 #endif
 
+#ifdef WITH_GART
+#include "graphlearn_torch/include/grin/grin_graph.h"
+#include "graphlearn_torch/include/grin/grin_feature.h"
+#endif
+
 #ifdef WITH_CUDA
 #include "graphlearn_torch/csrc/cuda/inducer.cuh"
 #include "graphlearn_torch/csrc/cuda/random_negative_sampler.cuh"
