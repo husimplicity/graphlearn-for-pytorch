@@ -94,7 +94,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def("get_col_count", &Graph::GetColCount)
     .def("get_mode", &Graph::GetGraphMode);
   
-  py::class_<GrinGraph>(m, "GrinGraph")
+  py::class_<GrinGraph>(m, "CppGrinGraph")
     .def(py::init<const char*, const std::string&>())
     .def("get_row_count", &GrinGraph::GetRowCount)
     .def("get_edge_count", &GrinGraph::GetEdgeCount)
@@ -103,17 +103,17 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def("get_dst_type_name", &GrinGraph::GetDstTypeName)
     .def("get_edge_type_name", &GrinGraph::GetEdgeTypeName);
 
-  py::class_<GrinVertexFeature>(m, "GrinVertexFeature")
-    .def(py::init<const char*, const std::string&>())
-    .def("cpu_get", &GrinVertexFeature::cpu_get,
-         py::arg("ex_ids"))
-    .def("get_labels", &GrinVertexFeature::get_labels,
-         py::arg("ex_ids"));
+  // py::class_<GrinVertexFeature>(m, "GrinVertexFeature")
+  //   .def(py::init<const char*, const std::string&>())
+  //   .def("cpu_get", &GrinVertexFeature::cpu_get,
+  //        py::arg("ex_ids"))
+  //   .def("get_labels", &GrinVertexFeature::get_labels,
+  //        py::arg("ex_ids"));
   
-  py::class_<GrinEdgeFeature>(m, "GrinEdgeFeature")
-    .def(py::init<const char*, const std::string&>())
-    .def("cpu_get", &GrinEdgeFeature::cpu_get,
-         py::arg("ex_ids"));
+  // py::class_<GrinEdgeFeature>(m, "GrinEdgeFeature")
+  //   .def(py::init<const char*, const std::string&>())
+  //   .def("cpu_get", &GrinEdgeFeature::cpu_get,
+  //        py::arg("ex_ids"));
 
   py::class_<SubGraph>(m, "SubGraph")
     .def(py::init<>())

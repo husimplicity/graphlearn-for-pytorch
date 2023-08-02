@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+/*
 #include <torch/extension.h>
 
 #define GRIN_ENABLE_VERTEX_LIST_ARRAY
@@ -37,3 +37,4 @@ GRIN_VERTEX_LIST GetVertexListByType(GRIN_GRAPH graph, GRIN_VERTEX_TYPE vtype);
 GRIN_EDGE_LIST GetEdgeListByType(GRIN_GRAPH graph, GRIN_EDGE_TYPE etype);
 
 #endif // GRAPHLEARN_TORCH_INCLUDE_GRIN_UTILS_H_
+*/

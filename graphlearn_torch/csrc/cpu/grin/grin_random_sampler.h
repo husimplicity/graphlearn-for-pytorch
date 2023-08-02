@@ -13,33 +13,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include <torch/extension.h>
+// #include <torch/extension.h>
 
-#include "graphlearn_torch/include/grin/grin_sampler.h"
+// #include "graphlearn_torch/include/grin/grin_sampler.h"
 
-#ifndef GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_
-#define GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_
+// #ifndef GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_
+// #define GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_
 
-class GrinRandomSampler : public GrinSampler {
-public:
-  GrinRandomSampler(GrinGraph* graph) : GrinSampler(graph) {}
-  ~GrinRandomSampler() {}
+// class GrinRandomSampler : public GrinSampler {
+// public:
+//   GrinRandomSampler(GrinGraph* graph) : GrinSampler(graph) {}
+//   ~GrinRandomSampler() {}
 
-  std::tuple<torch::Tensor, torch::Tensor> Sample(
-    const torch::Tensor& nodes, int32_t req_num) override;
+//   std::tuple<torch::Tensor, torch::Tensor> Sample(
+//     const torch::Tensor& nodes, int32_t req_num) override;
 
-private:
-  void FillNbrsNum(const int64_t* nodes,
-                   const int32_t bs,
-                   const int32_t req_num,
-                   int64_t* out_nbr_num);
+// private:
+//   void FillNbrsNum(const int64_t* nodes,
+//                    const int32_t bs,
+//                    const int32_t req_num,
+//                    int64_t* out_nbr_num);
 
-  void CSRRowWiseSample(const int64_t* nodes,
-                        const int64_t* nbrs_offset,
-                        const int32_t bs,
-                        const int32_t req_num,
-                        int64_t* out_nbrs);
+//   void CSRRowWiseSample(const int64_t* nodes,
+//                         const int64_t* nbrs_offset,
+//                         const int32_t bs,
+//                         const int32_t req_num,
+//                         int64_t* out_nbrs);
 
-};
+// };
 
-#endif // GRAPHLEARN_TORCH_CPU_RANDOM_SAMPLER_H_
+// #endif // GRAPHLEARN_TORCH_CPU_RANDOM_SAMPLER_H_

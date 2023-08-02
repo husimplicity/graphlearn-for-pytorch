@@ -110,6 +110,8 @@ if(WITH_GART)
 endif()
 
 target_include_directories(graphlearn_torch
+  PUBLIC ${GLT_ROOT})
+target_include_directories(graphlearn_torch
   PUBLIC ${GLT_ROOT}/include)
 if(WITH_GART)
   target_include_directories(graphlearn_torch

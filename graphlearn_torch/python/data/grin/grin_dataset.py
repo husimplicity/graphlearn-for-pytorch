@@ -21,8 +21,8 @@ import torch
 
 from ...typing import NodeType, EdgeType, TensorDataType
 
-from .graph import GrinGraph
-from .feature import GrinFeature, GrinVertexFeature
+from .grin_graph import GrinGraph
+from .grin_feature import GrinFeature, GrinVertexFeature
 
 class GrinDataset:
   def __init__(
