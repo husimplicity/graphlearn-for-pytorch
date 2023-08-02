@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+/*
 #include <torch/extension.h>
 
 #define GRIN_ENABLE_VERTEX_LIST_ARRAY
@@ -105,3 +105,4 @@ private:
 
 
 #endif  // GRAPHLEARN_TORCH_INCLUDE_GRIN_FEATURE_H_
+*/

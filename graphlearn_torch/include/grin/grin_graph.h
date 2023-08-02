@@ -46,7 +46,7 @@ public:
     local_partitions_ = grin_get_local_partition_list(partitioned_graph_);
     partition_ = grin_get_partition_from_list(
       partitioned_graph_, local_partitions_, 0);
-
+    std::cout << "partition: " << partition_ << std::endl;
     graph_ = grin_get_local_graph_by_partition(partitioned_graph_, partition_);
     edge_type_ = grin_get_edge_type_by_name(graph_, edge_type_name.c_str());
     auto src_types = grin_get_src_types_by_edge_type(graph_, edge_type_);
@@ -70,11 +70,13 @@ public:
   }
 
   GRIN_VERTEX_LIST GetRowPtr() {
-    return grin_get_vertex_list_by_type(graph_, src_type_);
+    // return grin_get_vertex_list_by_type(graph_, src_type_);
+    return NULL;
   }
 
   int64_t GetRowCount() {
-    return grin_get_vertex_list_size(graph_, GetRowPtr());
+    // return grin_get_vertex_list_size(graph_, GetRowPtr());
+    return 0;
   }
 
   const char* GetSrcTypeName() {

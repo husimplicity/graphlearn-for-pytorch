@@ -15,7 +15,7 @@
 
 from abc import ABC, abstractmethod
 import torch
-from .. import py_graphlearn_torch as pywrap
+from ... import py_graphlearn_torch as pywrap
 
 class GrinFeature(ABC):
   def __getitem__(self, ids: torch.Tensor) -> torch.Tensor:
@@ -26,12 +26,12 @@ class GrinFeature(ABC):
     pass
 
   @abstractmethod
-  @property
+  # @property
   def shape(self) -> torch.Tensor:
     pass
 
   @abstractmethod
-  @property
+  # @property
   def size(self, dim: int) -> torch.int64:
     pass
 

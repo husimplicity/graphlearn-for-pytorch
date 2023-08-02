@@ -64,28 +64,34 @@ if WITH_VINEYARD == 'ON':
   libraries.append('vineyard_io')
 
 if WITH_GART == 'ON':
-  include_dirs.append('/usr/local/include')
-  include_dirs.append('/usr/local/include' + '/glog')
-  include_dirs.append('/usr/local/include' + '/gflags')
-  include_dirs.append('/usr/local/include' + '/vineyard')
+  # include_dirs.append('/usr/local/include')
+  # include_dirs.append('/usr/local/include' + '/glog')
+  # include_dirs.append('/usr/local/include' + '/gflags')
+  # include_dirs.append('/usr/local/include' + '/vineyard')
   include_dirs.append(ROOT_PATH + '/third_party')
   include_dirs.append(ROOT_PATH + '/third_party/grin/storage/GART')
-  
-  # update to the path of your grin build
-  library_dirs.append('/opt/wanglei/dev/GART/interfaces/grin/build')
-  
-  libraries.append('gart_grin')
-  libraries.append('glog')
 
+  # update to the path of your grin build
+  library_dirs.append('/root/grin_hsx/gart/interfaces/grin/build')
+
+  libraries.append('gart_grin')
+  # libraries.append('glog')
+
+
+libraries.append('graphlearn_torch')
+library_dirs.append(ROOT_PATH + '/built/lib')
 
 extra_cxx_flags.append('-D_GLIBCXX_USE_CXX11_ABI=0')
 extra_cxx_flags.append('-std=gnu++17')
 
 sources = ['graphlearn_torch/python/py_export.cc']
-sources += glob.glob('graphlearn_torch/csrc/**/**.cc', recursive=True)
 
-#if WITH_GART == 'ON':
-#  sources += glob.glob('graphlearn_torch/csrc/**/**/**.cc', recursive=True)
+if WITH_GART == 'ON':
+  sources += glob.glob('graphlearn_torch/csrc/**.cc', recursive=True)
+  sources += glob.glob('graphlearn_torch/csrc/cpu/**.cc', recursive=True)
+  sources += glob.glob('graphlearn_torch/csrc/cpu/grin/graph.cc', recursive=True)
+else:
+  sources += glob.glob('graphlearn_torch/csrc/**/**.cc', recursive=True)
 
 if WITH_CUDA == 'ON':
   sources += glob.glob('graphlearn_torch/csrc/**/**.cu', recursive=True)
@@ -153,6 +159,7 @@ setup(
     'graphlearn_torch.loader',
     'graphlearn_torch.partition',
     'graphlearn_torch.sampler',
-    'graphlearn_torch.utils'
+    'graphlearn_torch.utils',
+    'graphlearn_torch.data.grin'
   ]
 )
