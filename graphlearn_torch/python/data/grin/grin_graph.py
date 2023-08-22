@@ -30,7 +30,7 @@ class GrinGraph:
   @property
   def src_type_name(self):
     return self._graph.get_src_type_name()
-  
+
   @property
   def dst_type_name(self):
     return self._graph.get_dst_type_name()

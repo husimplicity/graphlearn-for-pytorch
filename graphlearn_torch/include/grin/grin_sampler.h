@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-/*
+
 #include <torch/extension.h>
 
 #include "graphlearn_torch/include/grin/grin_graph.h"
@@ -34,4 +34,3 @@ protected:
 };
 
 #endif  // GRAPHLEARN_TORCH_INCLUDE_GRIN_SAMPLER_H_
-*/
