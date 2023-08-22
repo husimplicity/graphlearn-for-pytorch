@@ -13,33 +13,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// #include <torch/extension.h>
+#include <torch/extension.h>
 
-// #include "graphlearn_torch/include/grin/grin_sampler.h"
+#include "graphlearn_torch/include/grin/grin_sampler.h"
 
-// #ifndef GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_
-// #define GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_
 
-// class GrinRandomSampler : public GrinSampler {
-// public:
-//   GrinRandomSampler(GrinGraph* graph) : GrinSampler(graph) {}
-//   ~GrinRandomSampler() {}
+#ifndef GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_
+#define GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_
 
-//   std::tuple<torch::Tensor, torch::Tensor> Sample(
-//     const torch::Tensor& nodes, int32_t req_num) override;
+class GrinRandomSampler : public GrinSampler {
+public:
+  GrinRandomSampler(GrinGraph* graph) : GrinSampler(graph) {}
+  ~GrinRandomSampler() {}
 
-// private:
-//   void FillNbrsNum(const int64_t* nodes,
-//                    const int32_t bs,
-//                    const int32_t req_num,
-//                    int64_t* out_nbr_num);
+  std::tuple<torch::Tensor, torch::Tensor> Sample(
+    const torch::Tensor& nodes, int32_t req_num) override;
 
-//   void CSRRowWiseSample(const int64_t* nodes,
-//                         const int64_t* nbrs_offset,
-//                         const int32_t bs,
-//                         const int32_t req_num,
-//                         int64_t* out_nbrs);
+private:
+  void FillNbrsNum(const int64_t* nodes,
+                   const int32_t bs,
+                   const int32_t req_num,
+                   int64_t* out_nbr_num);
 
-// };
+  void CSRRowWiseSample(const int64_t* nodes,
+                        const int64_t* nbrs_offset,
+                        const int32_t bs,
+                        const int32_t req_num,
+                        int64_t* out_nbrs);
 
-// #endif // GRAPHLEARN_TORCH_CPU_RANDOM_SAMPLER_H_
+};
+
+#endif // GRAPHLEARN_TORCH_CPU_RANDOM_SAMPLER_H_

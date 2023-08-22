@@ -22,7 +22,7 @@ class GrinFeature(ABC):
     return self.cpu_get(ids)
 
   @abstractmethod
-  def cpu_get(self, ids: torch.Tensor) -> torch.Tensor:
+  def cpu_get(self, ids: torch.Tensor, num_props: int) -> torch.Tensor:
     pass
 
   @abstractmethod
@@ -40,8 +40,8 @@ class GrinVertexFeature(GrinFeature):
     self._feature = pywrap.GrinVertexFeature(uri, vertex_type)
     self._id2index = id2index
 
-  def cpu_get(self, ids: torch.Tensor) -> torch.Tensor:
-    return self._feature.cpu_get(ids)
+  def cpu_get(self, ids: torch.Tensor, num_props: int) -> torch.Tensor:
+    return self._feature.cpu_get(ids, num_props)
   
   def get_labels(self, ids: torch.Tensor) -> torch.Tensor:
     return self._feature.get_labels(ids)
@@ -55,18 +55,18 @@ class GrinVertexFeature(GrinFeature):
     return torch.tensor(self._feature.size(dim), dtype=torch.int64)
 
 
-class GrinEdgeFeature(GrinFeature):
-  def __init__(self, uri, edge_type, id2index=None):
-    self._feature = pywrap.GrinEdgeFeature(uri, edge_type)
-    self._id2index = id2index
+# class GrinEdgeFeature(GrinFeature):
+#   def __init__(self, uri, edge_type, id2index=None):
+#     self._feature = pywrap.GrinEdgeFeature(uri, edge_type)
+#     self._id2index = id2index
 
-  def cpu_get(self, ids: torch.Tensor) -> torch.Tensor:
-    return self._feature.cpu_get(ids)
+#   def cpu_get(self, ids: torch.Tensor) -> torch.Tensor:
+#     return self._feature.cpu_get(ids)
 
-  @property
-  def shape(self) -> torch.Tensor:
-    return torch.tensor(self._feature.shape(), dtype=torch.int64)
+#   @property
+#   def shape(self) -> torch.Tensor:
+#     return torch.tensor(self._feature.shape(), dtype=torch.int64)
 
-  @property
-  def size(self, dim: int) -> torch.int64:
-    return torch.tensor(self._feature.size(dim), dtype=torch.int64)
+#   @property
+#   def size(self, dim: int) -> torch.int64:
+#     return torch.tensor(self._feature.size(dim), dtype=torch.int64)

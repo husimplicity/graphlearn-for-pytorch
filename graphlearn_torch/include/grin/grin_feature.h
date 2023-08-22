@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-/*
+
 #include <torch/extension.h>
 
 #define GRIN_ENABLE_VERTEX_LIST_ARRAY
@@ -47,7 +47,8 @@ public:
   }
   ~GrinFeature() {}
 
-  virtual torch::Tensor cpu_get(const torch::Tensor& ex_ids) = 0;
+  virtual torch::Tensor cpu_get(
+    const torch::Tensor& ex_ids, int64_t num_props) = 0;
 
 protected:
   GRIN_PARTITIONED_GRAPH          partitioned_graph_;
@@ -64,45 +65,44 @@ public:
     : GrinFeature(uri, type_name) {
     vertex_type_ = grin_get_vertex_type_by_name(graph_, type_name.c_str());
     vertex_list_ = grin_get_vertex_list_by_type(graph_, vertex_type_);
-    num_vertices_ = grin_get_vertex_list_size(graph_, vertex_list_);
+    // num_vertices_ = grin_get_vertex_list_size(graph_, vertex_list_);
   }
 
   ~GrinVertexFeature() {
     grin_destroy_vertex_list(graph_, vertex_list_);
   }
 
-  torch::Tensor cpu_get(const torch::Tensor& ex_ids) override;
+  torch::Tensor cpu_get(const torch::Tensor& ex_ids, int64_t num_props) override;
   torch::Tensor get_labels(const torch::Tensor& ex_ids);
 
 private:
   GRIN_VERTEX_TYPE  vertex_type_;
   GRIN_VERTEX_LIST  vertex_list_;
-  size_t            num_vertices_;
+  // size_t            num_vertices_;
 };
 
 
-class GrinEdgeFeature : public GrinFeature {
-public:
-  GrinEdgeFeature(const char* uri,
-                  const std::string& type_name)
-    : GrinFeature(uri, type_name) {
-    edge_type_ = grin_get_edge_type_by_name(graph_, type_name.c_str());
-    edge_list_ = grin_get_edge_list_by_type(graph_, edge_type_);
-    num_edges_ = grin_get_edge_list_size(graph_, edge_list_);
-  }
+// class GrinEdgeFeature : public GrinFeature {
+// public:
+//   GrinEdgeFeature(const char* uri,
+//                   const std::string& type_name)
+//     : GrinFeature(uri, type_name) {
+//     edge_type_ = grin_get_edge_type_by_name(graph_, type_name.c_str());
+//     edge_list_ = grin_get_edge_list_by_type(graph_, edge_type_);
+//     num_edges_ = grin_get_edge_list_size(graph_, edge_list_);
+//   }
 
-  ~GrinEdgeFeature() {
-    grin_destroy_edge_list(graph_, edge_list_);
-  }
+//   ~GrinEdgeFeature() {
+//     grin_destroy_edge_list(graph_, edge_list_);
+//   }
 
-  torch::Tensor cpu_get(const torch::Tensor& ex_ids) override;
+//   torch::Tensor cpu_get(const torch::Tensor& ex_ids) override;
 
-private:
-  GRIN_EDGE_TYPE  edge_type_;
-  GRIN_EDGE_LIST  edge_list_;
-  size_t          num_edges_;
-};
+// private:
+//   GRIN_EDGE_TYPE  edge_type_;
+//   GRIN_EDGE_LIST  edge_list_;
+//   size_t          num_edges_;
+// };
 
 
 #endif  // GRAPHLEARN_TORCH_INCLUDE_GRIN_FEATURE_H_
-*/

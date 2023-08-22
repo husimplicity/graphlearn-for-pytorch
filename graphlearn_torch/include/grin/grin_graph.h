@@ -16,11 +16,8 @@ limitations under the License.
 #include <torch/extension.h>
 
 #define GRIN_ENABLE_VERTEX_LIST_ARRAY
-#define GRIN_ENABLE_EDGE_LIST
-#define GRIN_ENABLE_EDGE_LIST_ARRAY
 #define GRIN_ENABLE_ADJACENT_LIST
 #define GRIN_ASSUME_ALL_VERTEX_LIST_SORTED
-#define GRIN_ENABLE_ADJACENT_LIST_ARRAY
 #define GRIN_ENABLE_VERTEX_EXTERNAL_ID_OF_INT64
 
 #include "predefine.h"

@@ -69,6 +69,7 @@ if WITH_GART == 'ON':
   # include_dirs.append('/usr/local/include' + '/gflags')
   # include_dirs.append('/usr/local/include' + '/vineyard')
   include_dirs.append(ROOT_PATH + '/third_party')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/extension/include')
   include_dirs.append(ROOT_PATH + '/third_party/grin/storage/GART')
 
   # update to the path of your grin build
@@ -89,7 +90,11 @@ sources = ['graphlearn_torch/python/py_export.cc']
 if WITH_GART == 'ON':
   sources += glob.glob('graphlearn_torch/csrc/**.cc', recursive=True)
   sources += glob.glob('graphlearn_torch/csrc/cpu/**.cc', recursive=True)
-  sources += glob.glob('graphlearn_torch/csrc/cpu/grin/graph.cc', recursive=True)
+  sources += glob.glob('graphlearn_torch/csrc/cpu/grin/**.cc', recursive=True)
+  # sources += glob.glob('graphlearn_torch/csrc/cpu/grin/grin_graph.cc', recursive=True)
+  # sources += glob.glob('graphlearn_torch/csrc/cpu/grin/grin_feature.cc', recursive=True)
+  # sources += glob.glob('graphlearn_torch/csrc/cpu/grin/grin_random_sampler.cc', recursive=True)
+
 else:
   sources += glob.glob('graphlearn_torch/csrc/**/**.cc', recursive=True)
 

@@ -20,6 +20,7 @@ import torch
 
 from .. import py_graphlearn_torch as pywrap
 from ..data import Graph
+from ..data.grin import GrinGraph
 from ..typing import NodeType, EdgeType, NumNeighbors, reverse_edge_type
 from ..utils import (
   merge_dict, merge_hetero_sampler_output, format_hetero_sampler_output,
@@ -38,7 +39,7 @@ class NeighborSampler(BaseSampler):
   r""" Neighbor Sampler.
   """
   def __init__(self,
-               graph: Union[Graph, Dict[EdgeType, Graph]],
+               graph: Union[Graph, GrinGraph, Dict[EdgeType, Graph], Dict[EdgeType, GrinGraph]],
                num_neighbors: Optional[NumNeighbors] = None,
                device: torch.device=torch.device('cuda', 0),
                with_edge: bool=False,
@@ -56,7 +57,20 @@ class NeighborSampler(BaseSampler):
     self._sampler = None
     self._neg_sampler = None
     self._inducer = None
-    if isinstance(self.graph, Graph): #homo
+    if isinstance(self.graph, GrinGraph): # grin
+      self._g_cls = 'homo'
+      self.device = torch.device('cpu')
+    elif isinstance(self.graph, Dict[EdgeType, GrinGraph]): #grin hetero
+      self._g_cls = 'hetero'
+      self.edge_types = []
+      self.node_types = set()
+      for etype, graph in self.graph.items():
+        self.edge_types.append(etype)
+        self.node_types.add(etype[0])
+        self.node_types.add(etype[2])
+      self.device = torch.device('cpu')
+      self._set_num_neighbors_and_num_hops(self.num_neighbors)
+    elif isinstance(self.graph, Graph): #homo
       self._g_cls = 'homo'
       if self.graph.mode == 'CPU':
         self.device = torch.device('cpu')
@@ -81,7 +95,9 @@ class NeighborSampler(BaseSampler):
   def lazy_init_sampler(self):
     if self._sampler is None:
       if self._g_cls == 'homo':
-        if self.device.type == 'cuda':
+        if isinstance(self.graph, GrinGraph):
+          self._sampler = pywrap.GrinRandomSampler(self.graph.graph_handler)
+        elif self.device.type == 'cuda':
           self._sampler = pywrap.CUDARandomSampler(self.graph.graph_handler)
         else:
           self._sampler = pywrap.CPURandomSampler(self.graph.graph_handler)
@@ -89,7 +105,9 @@ class NeighborSampler(BaseSampler):
       else: # hetero
         self._sampler = {}
         for etype, g in self.graph.items():
-          if self.device != torch.device('cpu'):
+          if isinstance(g, GrinGraph):
+            self._sampler[etype] = pywrap.GrinRandomSampler(g.graph_handler)
+          elif self.device != torch.device('cpu'):
             self._sampler[etype] = pywrap.CUDARandomSampler(g.graph_handler)
           else:
             self._sampler[etype] = pywrap.CPURandomSampler(g.graph_handler)
