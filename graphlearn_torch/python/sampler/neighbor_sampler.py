@@ -60,21 +60,12 @@ class NeighborSampler(BaseSampler):
     if isinstance(self.graph, GrinGraph): # grin
       self._g_cls = 'homo'
       self.device = torch.device('cpu')
-    elif isinstance(self.graph, Dict[EdgeType, GrinGraph]): #grin hetero
-      self._g_cls = 'hetero'
-      self.edge_types = []
-      self.node_types = set()
-      for etype, graph in self.graph.items():
-        self.edge_types.append(etype)
-        self.node_types.add(etype[0])
-        self.node_types.add(etype[2])
-      self.device = torch.device('cpu')
-      self._set_num_neighbors_and_num_hops(self.num_neighbors)
     elif isinstance(self.graph, Graph): #homo
       self._g_cls = 'homo'
       if self.graph.mode == 'CPU':
         self.device = torch.device('cpu')
-    else: # hetero
+
+    elif isinstance(self.graph, dict): #grin hetero
       self._g_cls = 'hetero'
       self.edge_types = []
       self.node_types = set()
@@ -82,8 +73,8 @@ class NeighborSampler(BaseSampler):
         self.edge_types.append(etype)
         self.node_types.add(etype[0])
         self.node_types.add(etype[2])
-      if self.graph[self.edge_types[0]].mode == 'CPU':
-        self.device = torch.device('cpu')
+      if isinstance(self.graph[self.edge_types[0]], GrinGraph) or self.graph[self.edge_types[0]].mode == 'CPU':
+          self.device = torch.device('cpu')
       self._set_num_neighbors_and_num_hops(self.num_neighbors)
 
 
@@ -212,8 +203,8 @@ class NeighborSampler(BaseSampler):
 
     return SamplerOutput(
       node=torch.cat(out_nodes),
-      row=torch.cat(out_cols),
-      col=torch.cat(out_rows),
+      row=torch.cat(out_cols) if len(out_cols) > 0 else torch.tensor(out_cols),
+      col=torch.cat(out_rows) if len(out_rows) > 0 else torch.tensor(out_rows),
       edge=(torch.cat(out_edges) if out_edges else None),
       batch=batch,
       num_sampled_nodes=num_sampled_nodes,

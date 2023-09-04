@@ -18,6 +18,7 @@ from typing import Union
 import torch
 
 from ..data import Dataset
+from ..data.grin import GrinDataset
 from ..sampler import BaseSampler, SamplerOutput, HeteroSamplerOutput
 from ..typing import InputNodes
 
@@ -53,7 +54,7 @@ class NodeLoader(object):
   """
   def __init__(
     self,
-    data: Dataset,
+    data: Union[Dataset, GrinDataset],
     node_sampler: BaseSampler,
     input_nodes: InputNodes,
     device: torch.device = torch.device(0),
@@ -69,8 +70,10 @@ class NodeLoader(object):
     else:
       input_type, input_seeds = None, self.input_nodes
     self._input_type = input_type
-
-    label = self.data.get_node_label(self._input_type)
+    if isinstance(data, Dataset):
+      label = self.data.get_node_label(self._input_type)
+    elif isinstance(data, GrinDataset):
+      label = self.data.get_node_label(input_nodes)
     self.input_t_label = label.to(self.device) if label is not None else None
 
     self._seed_loader = torch.utils.data.DataLoader(input_seeds, **kwargs)
