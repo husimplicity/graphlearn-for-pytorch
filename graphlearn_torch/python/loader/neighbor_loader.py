@@ -13,13 +13,14 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 
 from ..loader import NodeLoader
 
 from ..data import Dataset
+from ..data.grin import GrinDataset
 from ..sampler import NeighborSampler, NodeSamplerInput
 from ..typing import InputNodes, NumNeighbors
 
@@ -58,7 +59,7 @@ class NeighborLoader(NodeLoader):
   """
   def __init__(
     self,
-    data: Dataset,
+    data: Union[Dataset, GrinDataset],
     num_neighbors: NumNeighbors,
     input_nodes: InputNodes,
     neighbor_sampler: Optional[NeighborSampler] = None,

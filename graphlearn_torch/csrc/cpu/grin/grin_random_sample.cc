@@ -43,7 +43,7 @@ GrinRandomSampler::Sample(const torch::Tensor& nodes, int32_t req_num) {
   for(int64_t i = 1; i <= bs; ++i) {
     nbrs_offset[i] = nbrs_offset[i - 1] + nbrs_num_ptr[i - 1];
   }
-  std::cout << "here...." << std::endl;
+
   torch::Tensor nbrs = torch::empty(nbrs_offset[bs], nodes.options());
   CSRRowWiseSample(
     nodes_ptr, nbrs_offset, bs, req_num, nbrs.data_ptr<int64_t>());
@@ -76,7 +76,7 @@ void GrinRandomSampler::FillNbrsNum(const int64_t* nodes,
     }
   });
   grin_destroy_edge_type(graph, etype);
-  grin_destroy_graph(graph);
+  // grin_destroy_graph(graph);
 }
 
 void GrinRandomSampler::CSRRowWiseSample(
@@ -87,18 +87,18 @@ void GrinRandomSampler::CSRRowWiseSample(
     int64_t* out_nbrs) {
   GRIN_GRAPH graph = graph_->GetGraph();
   GRIN_EDGE_TYPE etype = graph_->GetEdgeType();
-  std::cout << "here......" << std::endl;
+  std::cout << "etype: " << etype << std::endl;
   at::parallel_for(0, bs, 1, [&](int32_t start, int32_t end) {
     for(int32_t i = start; i < end; ++i) {
       auto v = nodes[i];
       auto src = grin_get_vertex_by_external_id_of_int64(graph, v);
-      std::cout << i << std::endl;
+      // std::cout << "v: " << v << " src: " << src << std::endl;
       if (src != GRIN_NULL_VERTEX) {
         auto src_adj_list = grin_get_adjacent_list_by_edge_type(
           graph, GRIN_DIRECTION::OUT, src, etype);
         auto src_idx_adj_list = grin_get_indexed_adjacent_list(graph, src_adj_list);
         auto src_degree = grin_get_indexed_adjacent_list_size(graph, src_idx_adj_list);
-        
+
         if (req_num < src_degree) {
           thread_local static std::random_device rd;
           thread_local static std::mt19937 engine(rd());
@@ -125,7 +125,7 @@ void GrinRandomSampler::CSRRowWiseSample(
       }
     }
   });
-  std::cout << "Here" << std::endl;
+  // std::cout << "Here" << std::endl;
   grin_destroy_edge_type(graph, etype);
-  grin_destroy_graph(graph);
+  // grin_destroy_graph(graph);
 } 
