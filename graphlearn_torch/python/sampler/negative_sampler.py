@@ -55,3 +55,13 @@ class RandomNegativeSampler(object):
     elif self.edge_dir == 'in':
       cols, rows = self._sampler.sample(req_num, trials_num, padding)
     return torch.stack([rows, cols], dim=0)
+
+
+class GrinNegativeSampler(object):
+  def __init__(self, grin_graph, edge_dir='out'):
+    self.edge_dir = edge_dir
+  
+  def sample(self, req_num, seeds):
+    rows = seeds[torch.randperm(seeds.size(0))][:req_num]
+    cols = seeds[torch.randperm(seeds.size(0))][:req_num]
+    return torch.stack([rows, cols], dim=0)

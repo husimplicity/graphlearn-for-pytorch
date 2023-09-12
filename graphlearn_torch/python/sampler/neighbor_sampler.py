@@ -33,7 +33,7 @@ from .base import (
   NodeSamplerInput, EdgeSamplerInput,
   SamplerOutput, HeteroSamplerOutput, NeighborOutput,
 )
-from .negative_sampler import RandomNegativeSampler
+from .negative_sampler import RandomNegativeSampler, GrinNegativeSampler
 
 class NeighborSampler(BaseSampler):
   r""" Neighbor Sampler.
@@ -107,19 +107,29 @@ class NeighborSampler(BaseSampler):
   def lazy_init_neg_sampler(self):
     if self._neg_sampler is None and self.with_neg:
       if self._g_cls == 'homo':
-        self._neg_sampler = RandomNegativeSampler(
-          graph=self.graph,
-          mode=self.device.type.upper(),
-          edge_dir=self.edge_dir
-        )
-      else: # hetero
-        self._neg_sampler = {}
-        for etype, g in self.graph.items():
-          self._neg_sampler[etype] = RandomNegativeSampler(
-            graph=g,
+        if isinstance(self.graph, GrinGraph):
+          self._neg_sampler = GrinNegativeSampler(
+            grin_graph=self.graph, edge_dir=self.edge_dir
+          )
+        else:
+          self._neg_sampler = RandomNegativeSampler(
+            graph=self.graph,
             mode=self.device.type.upper(),
             edge_dir=self.edge_dir
           )
+      else: # hetero
+        self._neg_sampler = {}
+        for etype, g in self.graph.items():
+          if isinstance(self.graph, GrinGraph):
+            self._neg_sampler[etype] = GrinNegativeSampler(
+              grin_graph=self.graph, edge_dir=self.edge_dir
+            )
+          else:
+            self._neg_sampler[etype] = RandomNegativeSampler(
+              graph=g,
+              mode=self.device.type.upper(),
+              edge_dir=self.edge_dir
+            )
 
   def lazy_init_subgraph_op(self):
     if self._subgraph_op is None:
@@ -302,6 +312,7 @@ class NeighborSampler(BaseSampler):
   def sample_from_edges(
     self,
     inputs: EdgeSamplerInput,
+    seeds: torch.Tensor = None,
     **kwargs,
   ) -> Union[HeteroSamplerOutput, SamplerOutput]:
     r"""Performs sampling from an edge sampler input, leveraging a sampling
@@ -330,9 +341,15 @@ class NeighborSampler(BaseSampler):
       if neg_sampling.is_binary():
         # In the "binary" case, we randomly sample negative pairs of nodes.
         if input_type is not None:
-          neg_pair = self._neg_sampler[input_type].sample(num_neg)
+          if isinstance(self.graph[input_type], GrinGraph):
+            neg_pair = self._neg_sampler[input_type].sample(num_neg, neg_sampling.seeds)
+          else:
+            neg_pair = self._neg_sampler[input_type].sample(num_neg)
         else:
-          neg_pair = self._neg_sampler.sample(num_neg)
+          if isinstance(self.graph, GrinGraph):
+            neg_pair = self._neg_sampler.sample(num_neg, neg_sampling.seeds)
+          else:
+            neg_pair = self._neg_sampler.sample(num_neg)
         src_neg, dst_neg = neg_pair[0], neg_pair[1]
         src = torch.cat([src, src_neg], dim=0)
         dst = torch.cat([dst, dst_neg], dim=0)

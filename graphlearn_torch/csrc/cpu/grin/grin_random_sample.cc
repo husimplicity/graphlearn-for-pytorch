@@ -34,7 +34,6 @@ GrinRandomSampler::Sample(const torch::Tensor& nodes, int32_t req_num) {
   if (req_num < 0) req_num = std::numeric_limits<int32_t>::max();
   const int64_t* nodes_ptr = nodes.data_ptr<int64_t>();
   int64_t bs = nodes.size(0);
-  std::cout << bs << std::endl;
   torch::Tensor nbrs_num = torch::empty(bs, nodes.options());
   auto nbrs_num_ptr = nbrs_num.data_ptr<int64_t>();
   FillNbrsNum(nodes_ptr, bs, req_num, nbrs_num_ptr);
@@ -87,7 +86,6 @@ void GrinRandomSampler::CSRRowWiseSample(
     int64_t* out_nbrs) {
   GRIN_GRAPH graph = graph_->GetGraph();
   GRIN_EDGE_TYPE etype = graph_->GetEdgeType();
-  std::cout << "etype: " << etype << std::endl;
   at::parallel_for(0, bs, 1, [&](int32_t start, int32_t end) {
     for(int32_t i = start; i < end; ++i) {
       auto v = nodes[i];
