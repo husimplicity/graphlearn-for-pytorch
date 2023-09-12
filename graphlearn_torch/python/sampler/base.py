@@ -110,10 +110,12 @@ class NegativeSampling(CastMixin):
         mode: Union[NegativeSamplingMode, str],
         amount: Union[int, float] = 1,
         weight: Optional[torch.Tensor] = None,
+        seeds: Optional[torch.Tensor] = None,
     ):
         self.mode = NegativeSamplingMode(mode)
         self.amount = amount
         self.weight = weight
+        self.seeds = seeds # for grin negative sampling
 
         if self.amount <= 0:
             raise ValueError(f"The attribute 'amount' needs to be positive "

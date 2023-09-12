@@ -38,6 +38,7 @@ class GrinDataset:
     self.node_features = node_features
     self.edge_features = edge_features
     self.edge_dir = edge_dir
+    self.label = None
 
   def init_graph(self, edge_type_name: Union[str, List[str]]):
     # directly init from storage below grin
@@ -58,15 +59,22 @@ class GrinDataset:
   ):
     # id2idx provides external ids
     # vertex type must be provided to Grin for init
-    self.node_features = {}
-    for ntype, idx in id2idx.items():
-      self.node_features[ntype] = GrinVertexFeature(
+    if len(id2idx) == 1:
+      self.node_features = GrinVertexFeature(
         uri=self.uri,
-        vertex_type=ntype,
+        vertex_type=list(id2idx.keys())[0],
         num_props=num_props,
-        id2index=idx
+        id2index=list(id2idx.values())[0]
       )
-
+    else:
+      self.node_features = {}
+      for ntype, idx in id2idx.items():
+        self.node_features[ntype] = GrinVertexFeature(
+          uri=self.uri,
+          vertex_type=ntype,
+          num_props=num_props,
+          id2index=idx
+        )
 
   def get_graph(self, etype: Optional[EdgeType] = None):
     if isinstance(self.graph, GrinGraph):
@@ -109,3 +117,6 @@ class GrinDataset:
       ntype, ids = n_ids
       return self.node_features[ntype].get_labels(ids)
     return self.node_features.get_labels(n_ids)
+  
+  def init_node_label(self, n_ids):
+    self.label = self.get_node_label(n_ids)

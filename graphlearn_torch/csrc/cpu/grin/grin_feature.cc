@@ -65,7 +65,7 @@ torch::Tensor GrinVertexFeature::get_labels(const torch::Tensor& ex_ids) {
   at::parallel_for(0, bs, 1, [&](int32_t start, int32_t end) {
     for (int32_t i = start; i < end; ++i) {
       auto v = grin_get_vertex_by_external_id_of_int64(graph_, ex_ids_ptr[i]);
-      int64_t vlabel = grin_get_vertex_property_value_of_int64(graph_, v, prop);
+      int64_t vlabel = grin_get_vertex_property_value_of_int32(graph_, v, prop);
       grin_destroy_vertex(graph_, v);
       vlabels[i] = vlabel;
     }

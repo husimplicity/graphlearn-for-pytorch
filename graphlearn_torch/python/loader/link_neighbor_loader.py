@@ -13,13 +13,14 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 
 from ..loader import LinkLoader
 
 from ..data import Dataset
+from ..data.grin import GrinDataset
 from ..sampler import NegativeSampling, NeighborSampler
 from ..typing import NumNeighbors, InputEdges
 
@@ -110,7 +111,7 @@ class LinkNeighborLoader(LinkLoader):
 
   def __init__(
     self,
-    data: Dataset,
+    data: Union[Dataset, GrinDataset],
     num_neighbors: NumNeighbors,
     neighbor_sampler: Optional[NeighborSampler] = None,
     edge_label_index: InputEdges = None,

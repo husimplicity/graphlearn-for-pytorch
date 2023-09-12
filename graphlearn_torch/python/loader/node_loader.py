@@ -73,7 +73,7 @@ class NodeLoader(object):
     if isinstance(data, Dataset):
       label = self.data.get_node_label(self._input_type)
     elif isinstance(data, GrinDataset):
-      label = self.data.get_node_label(input_nodes)
+      label = self.data.label
     self.input_t_label = label.to(self.device) if label is not None else None
 
     self._seed_loader = torch.utils.data.DataLoader(input_seeds, **kwargs)

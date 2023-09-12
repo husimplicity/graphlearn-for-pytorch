@@ -22,6 +22,7 @@ from .transform import to_data, to_hetero_data
 
 from ..utils import convert_to_tensor
 from ..data import Dataset
+from ..data.grin import GrinDataset
 from ..sampler import (
   BaseSampler,
   EdgeSamplerInput,
@@ -99,7 +100,7 @@ class LinkLoader(object):
   """
   def __init__(
     self,
-    data: Dataset,
+    data: Union[Dataset, GrinDataset],
     link_sampler: BaseSampler,
     edge_label_index: InputEdges = None,
     edge_label: Optional[torch.Tensor] = None,
