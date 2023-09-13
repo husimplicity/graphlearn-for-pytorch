@@ -5,7 +5,7 @@ from torch_geometric.nn import GraphSAGE
 from ogb.nodeproppred import Evaluator
 
 from graphlearn_torch.data.grin import GrinDataset
-from graphlearn_torch.loader import NeighborLoader, NeighborLoader
+from graphlearn_torch.loader import NeighborLoader
 
 
 @torch.no_grad()
@@ -37,8 +37,10 @@ grindataset.init_node_feat(
 grindataset.init_node_label(n_ids=torch.arange(0, 2449029, dtype=torch.int64))
 
 seeds = torch.randperm(2449029, dtype=torch.int64)
-train_ids = seeds[:round(2449029 * 0.1)]
-test_ids = seeds[round(2449029 * 0.1):]
+# train_ids = seeds[:round(2449029 * 0.1)]
+train_ids = torch.load("../../examples/train_idx.pt")
+# test_ids = seeds[round(2449029 * 0.1):]
+test_ids = torch.load("../../examples/test_idx.pt")
 device = torch.device('cpu')
 
 train_loader = NeighborLoader(grindataset,
@@ -72,6 +74,7 @@ for epoch in range(20):
     start = time.time()
     total_examples = total_loss = 0
     for batch in tqdm.tqdm(train_loader):
+        # print(batch.edge_index.size(1))
         optimizer.zero_grad()
 
         out = model(
