@@ -113,7 +113,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   py::class_<GrinVertexFeature>(m, "GrinVertexFeature")
     .def(py::init<const char*, const std::string&>())
     .def("cpu_get", &GrinVertexFeature::cpu_get,
-         py::arg("ex_ids"), py::arg("num_props"))
+         py::arg("ex_ids"))
     .def("get_labels", &GrinVertexFeature::get_labels,
          py::arg("ex_ids"));
   

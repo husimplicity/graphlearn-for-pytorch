@@ -19,15 +19,14 @@ from ...utils import convert_to_tensor
 from ... import py_graphlearn_torch as pywrap
 
 class GrinFeature(ABC):
-  def __init__(self, num_props) -> None:
+  def __init__(self) -> None:
     super().__init__()
-    self.num_props = num_props
 
   def __getitem__(self, ids: torch.Tensor) -> torch.Tensor:
-    return self.cpu_get(ids, self.num_props)
+    return self.cpu_get(ids)
 
   @abstractmethod
-  def cpu_get(self, ids: torch.Tensor, num_props: int) -> torch.Tensor:
+  def cpu_get(self, ids: torch.Tensor) -> torch.Tensor:
     pass
 
   @abstractmethod
@@ -41,13 +40,13 @@ class GrinFeature(ABC):
     pass
 
 class GrinVertexFeature(GrinFeature):
-  def __init__(self, uri, vertex_type, num_props, id2index=None):
-    super().__init__(num_props)
+  def __init__(self, uri, vertex_type, id2index=None):
+    super().__init__()
     self._feature = pywrap.GrinVertexFeature(uri, vertex_type)
     self._id2index = id2index
 
-  def cpu_get(self, ids: torch.Tensor, num_props: int) -> torch.Tensor:
-    return self._feature.cpu_get(ids, num_props)
+  def cpu_get(self, ids: torch.Tensor) -> torch.Tensor:
+    return self._feature.cpu_get(ids)
   
   def get_labels(self, ids: torch.Tensor) -> torch.Tensor:
     return self._feature.get_labels(ids)
