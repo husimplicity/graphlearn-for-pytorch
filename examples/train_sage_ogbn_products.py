@@ -81,7 +81,7 @@ class SAGE(torch.nn.Module):
     pbar.close()
     return x_all
 
-root = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'products')
+root = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'ogbn-products')
 dataset = PygNodePropPredDataset('ogbn-products', root)
 split_idx = dataset.get_idx_split()
 evaluator = Evaluator(name='ogbn-products')
@@ -95,18 +95,19 @@ test_loader = NeighborSampler(data.edge_index, node_idx=None, sizes=[-1],
 glt_dataset = glt.data.Dataset()
 glt_dataset.init_graph(
   edge_index=dataset[0].edge_index,
-  graph_mode='ZERO_COPY',
-  directed=False
+  graph_mode='CPU',
+  directed=True
 )
 glt_dataset.init_node_features(
   node_feature_data=data.x,
   sort_func=glt.data.sort_by_in_degree,
-  split_ratio=0.2,
-  device_group_list=[glt.data.DeviceGroup(0, [0])],
+  with_gpu=False
+  # split_ratio=0.2,
+  # device_group_list=[glt.data.DeviceGroup(0, [0])],
 )
 glt_dataset.init_node_labels(node_label_data=data.y)
 
-device = torch.device(0)
+device = torch.device('cpu')
 # graphlearn_torch NeighborLoader
 train_loader = glt.loader.NeighborLoader(glt_dataset,
                                          [15, 10, 5],

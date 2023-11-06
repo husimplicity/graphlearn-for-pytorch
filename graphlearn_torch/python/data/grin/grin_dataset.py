@@ -54,7 +54,6 @@ class GrinDataset:
 
   def init_node_feat(
     self,
-    num_props: int,
     id2idx: Dict[NodeType, TensorDataType]
   ):
     # id2idx provides external ids
@@ -63,7 +62,6 @@ class GrinDataset:
       self.node_features = GrinVertexFeature(
         uri=self.uri,
         vertex_type=list(id2idx.keys())[0],
-        num_props=num_props,
         id2index=list(id2idx.values())[0]
       )
     else:
@@ -72,7 +70,6 @@ class GrinDataset:
         self.node_features[ntype] = GrinVertexFeature(
           uri=self.uri,
           vertex_type=ntype,
-          num_props=num_props,
           id2index=idx
         )
 

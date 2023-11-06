@@ -69,6 +69,8 @@ if WITH_GART == 'ON':
   # include_dirs.append('/usr/local/include' + '/gflags')
   # include_dirs.append('/usr/local/include' + '/vineyard')
   include_dirs.append(ROOT_PATH + '/third_party')
+  include_dirs.append(ROOT_PATH + '/third_party/grin')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/include')
   include_dirs.append(ROOT_PATH + '/third_party/grin/extension/include')
   include_dirs.append(ROOT_PATH + '/third_party/grin/storage/GART')
 

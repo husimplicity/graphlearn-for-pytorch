@@ -14,11 +14,14 @@ limitations under the License.
 ==============================================================================*/
 
 #include <torch/extension.h>
+#include <unordered_map>
 
 #define GRIN_ENABLE_VERTEX_LIST_ARRAY
 #define GRIN_ENABLE_ADJACENT_LIST
 #define GRIN_ASSUME_ALL_VERTEX_LIST_SORTED
 #define GRIN_ENABLE_VERTEX_EXTERNAL_ID_OF_INT64
+#define GRIN_ENABLE_ADJACENT_LIST_ITERATOR
+#define GRIN_ENABLE_SCHEMA
 
 #include "predefine.h"
 
@@ -31,6 +34,7 @@ limitations under the License.
 #include "grin/include/property/type.h"
 #include "grin/include/property/topology.h"
 #include "grin/include/index/external_id.h"
+#include "grin/extension/handle.h"
 
 #ifndef GRAPHLEARN_TORCH_INCLUDE_GRIN_GRAPH_H_
 #define GRAPHLEARN_TORCH_INCLUDE_GRIN_GRAPH_H_
@@ -98,6 +102,19 @@ public:
     return 0;
   }
 
+  GRIN_INDEXED_ADJACENT_LIST GetIndexedAdjList(int64_t src_id) {
+    if (auto search = src_idx_adj_list_.find(src_id);
+        search != src_idx_adj_list_.end()) {
+      return search->second;
+    } else {
+      return nullptr;
+    }
+  }
+
+  void SetIndexedAdjList(int64_t src_id, GRIN_INDEXED_ADJACENT_LIST adj_list) {
+    src_idx_adj_list_[src_id] = adj_list;
+  }
+
 private:
   friend class GrinRandomSampler;
   GRIN_PARTITIONED_GRAPH  partitioned_graph_;
@@ -108,6 +125,8 @@ private:
   GRIN_EDGE_TYPE          edge_type_;
   GRIN_VERTEX_TYPE        src_type_;
   GRIN_VERTEX_TYPE        dst_type_;
+  std::unordered_map<int64_t, GRIN_INDEXED_ADJACENT_LIST> src_idx_adj_list_;
+
   int64_t                 row_count_;
   int64_t                 edge_count_;
   int64_t                 col_count_;

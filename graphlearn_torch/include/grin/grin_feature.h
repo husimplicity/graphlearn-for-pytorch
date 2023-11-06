@@ -18,6 +18,7 @@ limitations under the License.
 #define GRIN_ENABLE_VERTEX_LIST_ARRAY
 #define GRIN_ENABLE_EDGE_LIST
 #define GRIN_ENABLE_EDGE_LIST_ARRAY
+#define GRIN_ENABLE_SCHEMA
 
 #include "predefine.h"
 
@@ -47,8 +48,7 @@ public:
   }
   ~GrinFeature() {}
 
-  virtual torch::Tensor cpu_get(
-    const torch::Tensor& ex_ids, int64_t num_props) = 0;
+  virtual torch::Tensor cpu_get(const torch::Tensor& ex_ids) = 0;
 
 protected:
   GRIN_PARTITIONED_GRAPH          partitioned_graph_;
@@ -72,7 +72,7 @@ public:
     grin_destroy_vertex_list(graph_, vertex_list_);
   }
 
-  torch::Tensor cpu_get(const torch::Tensor& ex_ids, int64_t num_props) override;
+  torch::Tensor cpu_get(const torch::Tensor& ex_ids) override;
   torch::Tensor get_labels(const torch::Tensor& ex_ids);
 
 private:

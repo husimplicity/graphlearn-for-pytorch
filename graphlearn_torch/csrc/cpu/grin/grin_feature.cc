@@ -26,34 +26,37 @@ limitations under the License.
 #include "grin/include/index/external_id.h"
 #include "grin/include/property/property.h"
 #include "grin/include/property/propertylist.h"
+#include "grin/include/property/value.h"
+#include <chrono>
 
-
-torch::Tensor GrinVertexFeature::cpu_get(const torch::Tensor& ex_ids,
-                                         int64_t num_props) { 
+torch::Tensor GrinVertexFeature::cpu_get(const torch::Tensor& ex_ids) { 
   int64_t bs = ex_ids.size(0);
   int64_t* ex_ids_ptr = ex_ids.data_ptr<int64_t>();
   auto props = grin_get_vertex_property_list_by_type(graph_, vertex_type_);
   auto prop = grin_get_vertex_property_from_list(graph_, props, 0);
-
-  torch::Tensor vfeats = torch::empty({bs, num_props}, torch::kFloat32);
-
+  auto v0 = grin_get_vertex_by_external_id_of_int64(graph_, ex_ids_ptr[0]);
+  size_t* num_props = new size_t;
+  grin_get_vertex_property_value_of_float_array(graph_, v0, prop, num_props);
+  size_t np = *num_props;
+  auto options = torch::TensorOptions().dtype(torch::kFloat32);
+  std::vector<torch::Tensor> vfeats;
+  vfeats.resize(bs);
   at::parallel_for(0, bs, 1, [&](int32_t start, int32_t end) {
     for (int32_t i = start; i < end; i++) {
       auto v = grin_get_vertex_by_external_id_of_int64(graph_, ex_ids_ptr[i]);
-      vfeats[i] = torch::from_blob(
-        const_cast<float*>(
-          grin_get_vertex_property_value_of_float_array(graph_, v, prop)),
-        {num_props}, torch::kFloat32
-      );
+      float* p = const_cast<float*>(
+          grin_get_vertex_property_value_of_float_array(graph_, v, prop, num_props));
+      vfeats[i] = torch::from_blob(p, {np}, options);
       grin_destroy_vertex(graph_, v);
     }
     grin_destroy_vertex_property(graph_, prop);
   });
 
+  delete num_props;
   grin_destroy_vertex_property(graph_, prop);
   grin_destroy_vertex_property_list(graph_, props);
-
-  return vfeats;
+  auto vf = torch::stack(vfeats, 0);
+  return vf;
 }
 
 torch::Tensor GrinVertexFeature::get_labels(const torch::Tensor& ex_ids) {
