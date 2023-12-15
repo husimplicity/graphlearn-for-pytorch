@@ -29,19 +29,21 @@ def test(model, test_loader, dataset_name):
     })['acc']
     return test_acc
 
-grindataset = GrinDataset(uri="gart://127.0.0.1:23760?read_epoch=6429&total_partition_num=1&local_partition_num=1&start_partition_id=0&meta_prefix=gart_meta_")
-
-grindataset.init_graph(edge_type_name="paper_cites_paper")
+# grindataset = GrinDataset(uri="gart://127.0.0.1:23760?read_epoch=6429&total_partition_num=1&local_partition_num=1&start_partition_id=0&meta_prefix=gart_meta_")
+grindataset = GrinDataset(uri="v6d://38883106316118132?ipc_socket=/tmp/vineyard.sock.1701158638.800426")
+grindataset.init_graph(edge_type_name="cites")
 grindataset.init_node_feat(id2idx={"paper": torch.arange(0, 2449029, dtype=torch.int64)})
+#grindataset.init_node_feat({"paper": "features"})
+#grindataset.init_node_label({"paper": "label"})
 grindataset.init_node_label(n_ids=torch.arange(0, 2449029, dtype=torch.int64))
 
 seeds = torch.randperm(2449029, dtype=torch.int64)
-# train_ids = seeds[round(2449029 * 0.5):round(2449029 * 0.6)]
+# train_ids = seeds[round(2449029 * 0):round(2449029 * 0.08)]
 train_ids = torch.load("../../examples/train_idx.pt")
-# test_ids = seeds[round(2449029 * 0.9):]
+# test_ids = seeds[round(2449029 * 0.1):]
 test_ids = torch.load("../../examples/test_idx.pt")
 device = torch.device('cpu')
-
+print("loading done!")
 train_loader = NeighborLoader(grindataset,
                               [15, 10, 5],
                               input_nodes=train_ids,
@@ -73,7 +75,8 @@ for epoch in range(20):
     start = time.time()
     total_examples = total_loss = 0
     for batch in tqdm.tqdm(train_loader):
-        print(batch.edge_index.size(1))
+        # print(batch.node)
+        # break
         sample_time = time.time()
         print(f'sample time: {sample_time - start}')
         # print(batch.y[batch.y > 47])
@@ -94,5 +97,5 @@ for epoch in range(20):
     print(f'Epoch: {epoch:03d}, Loss: {(total_loss / total_examples):.4f},')
         #   f'Epoch Time: {end - start}')
 
-    test_acc = test(model, test_loader, 'ogbn-products')
-    print(f'Test Acc: {test_acc:.4f}\n')
+    # test_acc = test(model, test_loader, 'ogbn-products')
+    # print(f'Test Acc: {test_acc:.4f}\n')

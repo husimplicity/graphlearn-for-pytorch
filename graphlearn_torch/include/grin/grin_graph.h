@@ -15,6 +15,7 @@ limitations under the License.
 
 #include <torch/extension.h>
 #include <unordered_map>
+#include <optional>
 
 #define GRIN_ENABLE_VERTEX_LIST_ARRAY
 #define GRIN_ENABLE_ADJACENT_LIST
@@ -102,12 +103,12 @@ public:
     return 0;
   }
 
-  GRIN_INDEXED_ADJACENT_LIST GetIndexedAdjList(int64_t src_id) {
+  std::optional<GRIN_INDEXED_ADJACENT_LIST> GetIndexedAdjList(int64_t src_id) {
     if (auto search = src_idx_adj_list_.find(src_id);
         search != src_idx_adj_list_.end()) {
       return search->second;
     } else {
-      return nullptr;
+      return std::nullopt;
     }
   }
 

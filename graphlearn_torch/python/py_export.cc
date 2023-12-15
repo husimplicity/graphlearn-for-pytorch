@@ -37,7 +37,7 @@ limitations under the License.
 #include "graphlearn_torch/include/grin/grin_feature.h"
 #endif
 
-#ifdef WITH_GART
+#ifdef WITH_GRIN
 #include "graphlearn_torch/include/grin/grin_graph.h"
 #include "graphlearn_torch/include/grin/grin_feature.h"
 #include "graphlearn_torch/csrc/cpu/grin/grin_random_sampler.h"
@@ -61,7 +61,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 #ifdef WITH_CUDA
   m.def("cuda_stitch_sample_results", &CUDAStitchSampleResults);
 #endif
-#ifdef WITH_VINEYARD
+#if defined(WITH_VINEYARD) && !defined(WITH_GRIN) 
   m.def("vineyard_to_csr", &ToCSR);
   m.def("load_vertex_feature_from_vineyard", &LoadVertexFeatures);
   m.def("load_edge_feature_from_vineyard", &LoadEdgeFeatures);
