@@ -44,19 +44,25 @@ class NeighborSampler(BaseSampler):
                device: torch.device=torch.device('cuda', 0),
                with_edge: bool=False,
                with_neg: bool=False,
+               with_weight: bool=False,
                strategy: str = 'random',
-               edge_dir: Literal['in', 'out'] = 'out'):
+               edge_dir: Literal['in', 'out'] = 'out',
+               seed: int = None):
     self.graph = graph
     self.num_neighbors = num_neighbors
     self.device = device
     self.with_edge = with_edge
     self.with_neg = with_neg
+    self.with_weight = with_weight
     self.strategy = strategy
     self.edge_dir = edge_dir
     self._subgraph_op = None
     self._sampler = None
     self._neg_sampler = None
     self._inducer = None
+
+    if seed is not None:
+      pywrap.RandomSeedManager.getInstance().setSeed(seed)
     if isinstance(self.graph, GrinGraph): # grin
       self._g_cls = 'homo'
       self.device = torch.device('cpu')
@@ -90,8 +96,10 @@ class NeighborSampler(BaseSampler):
           self._sampler = pywrap.GrinRandomSampler(self.graph.graph_handler)
         elif self.device.type == 'cuda':
           self._sampler = pywrap.CUDARandomSampler(self.graph.graph_handler)
-        else:
+        elif self.with_weight == False:
           self._sampler = pywrap.CPURandomSampler(self.graph.graph_handler)
+        else:
+          self._sampler = pywrap.CPUWeightedSampler(self.graph.graph_handler)
 
       else: # hetero
         self._sampler = {}
@@ -100,8 +108,10 @@ class NeighborSampler(BaseSampler):
             self._sampler[etype] = pywrap.GrinRandomSampler(g.graph_handler)
           elif self.device != torch.device('cpu'):
             self._sampler[etype] = pywrap.CUDARandomSampler(g.graph_handler)
-          else:
+          elif self.with_weight == False:
             self._sampler[etype] = pywrap.CPURandomSampler(g.graph_handler)
+          else:
+            self._sampler[etype] = pywrap.CPUWeightedSampler(g.graph_handler)
 
 
   def lazy_init_neg_sampler(self):
@@ -148,10 +158,12 @@ class NeighborSampler(BaseSampler):
     sampler = self._sampler[etype] if etype is not None else self._sampler
     input_seeds = input_seeds.to(self.device)
     edge_ids = None
+
     if not self.with_edge:
       nbrs, nbrs_num = sampler.sample(input_seeds, req_num)
     else:
       nbrs, nbrs_num, edge_ids = sampler.sample_with_edge(input_seeds, req_num)
+
     if nbrs.numel() == 0:
       nbrs = torch.tensor([], dtype=torch.int64 ,device=self.device)
       nbrs_num = torch.zeros_like(input_seeds, dtype=torch.int64, device=self.device)
@@ -253,7 +265,7 @@ class NeighborSampler(BaseSampler):
         # out sampling needs dst_type==seed_type, in sampling needs src_type==seed_type
         if self.edge_dir == 'in':
           src = src_dict.get(etype[-1], None)
-          if src is not None:
+          if src is not None and src.numel() > 0:
             output = self.sample_one_hop(src, req_num, etype)
             if output.nbr.numel() == 0:
               continue
@@ -262,7 +274,7 @@ class NeighborSampler(BaseSampler):
               edge_dict[reverse_edge_type(etype)] = output.edge
         elif self.edge_dir == 'out':
           src = src_dict.get(etype[0], None)
-          if src is not None:
+          if src is not None and src.numel() > 0:
             output = self.sample_one_hop(src, req_num, etype)
             if output.nbr.numel() == 0:
               continue

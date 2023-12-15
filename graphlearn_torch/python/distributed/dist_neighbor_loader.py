@@ -13,15 +13,16 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 
 import torch
 
-from ..sampler import NodeSamplerInput, SamplingType, SamplingConfig
-from ..typing import InputNodes, NumNeighbors
+from ..sampler import NodeSamplerInput, SamplingType, SamplingConfig, \
+    RemoteNodeSplitSamplerInput, RemoteNodePathSamplerInput
+from ..typing import InputNodes, NumNeighbors, Split
 
 from .dist_dataset import DistDataset
-from .dist_options import AllDistSamplingWorkerOptions
+from .dist_options import AllDistSamplingWorkerOptions, RemoteDistSamplingWorkerOptions
 from .dist_loader import DistLoader
 
 
@@ -78,19 +79,38 @@ class DistNeighborLoader(DistLoader):
                shuffle: bool = False,
                drop_last: bool = False,
                with_edge: bool = False,
+               with_weight: bool = False,
                edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
+               random_seed: int = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
+
     if isinstance(input_nodes, tuple):
       input_type, input_seeds = input_nodes
     else:
       input_type, input_seeds = None, input_nodes
-    input_data = NodeSamplerInput(node=input_seeds, input_type=input_type)
+
+    if isinstance(worker_options, RemoteDistSamplingWorkerOptions):
+      if isinstance(input_seeds, Split):
+        input_data = RemoteNodeSplitSamplerInput(split=input_seeds, input_type=input_type)
+        if isinstance(worker_options.server_rank, List):
+          input_data = [input_data] * len(worker_options.server_rank)
+      elif isinstance(input_seeds, List):
+        input_data = []
+        for elem in input_seeds:
+          input_data.append(RemoteNodePathSamplerInput(node_path=elem, input_type=input_type))
+      elif isinstance(input_seeds, str):
+        input_data = RemoteNodePathSamplerInput(node_path=input_seeds, input_type=input_type)
+      else:
+        raise ValueError("Invalid input seeds")
+    else:
+      input_data = NodeSamplerInput(node=input_seeds, input_type=input_type)
 
     sampling_config = SamplingConfig(
       SamplingType.NODE, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg=False, edge_dir=edge_dir
+      drop_last, with_edge, collect_features, with_neg=False, 
+      with_weight=with_weight, edge_dir=edge_dir, seed=random_seed
     )
 
     super().__init__(

@@ -67,7 +67,12 @@ class RpcSamplingCallee(RpcCalleeBase):
     ensure_device(self.device)
     output = self.sampler.sample_one_hop(*args, **kwargs)
     if output is None:
-      return torch.tensor([], torch.device('cpu'), dtype=torch.int64)
+      nbrs = torch.tensor([], dtype=torch.int64, device=torch.device('cpu'))
+      nbrs_num = torch.zeros_like(args[0], dtype=torch.int64,
+                                  device=torch.device('cpu'))
+      edge_ids = torch.tensor([], device=torch.device('cpu'), dtype=torch.int64) \
+        if self.with_edge else None
+      return NeighborOutput(nbrs, nbrs_num, edge_ids)
     return output.to(torch.device('cpu'))
 
 class RpcSubGraphCallee(RpcCalleeBase):
@@ -114,21 +119,25 @@ class DistNeighborSampler(ConcurrentEventLoop):
                num_neighbors: Optional[NumNeighbors] = None,
                with_edge: bool = False,
                with_neg: bool = False,
+               with_weight: bool = False,
                edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                channel: Optional[ChannelBase] = None,
                concurrency: int = 1,
-               device: Optional[torch.device] = None):
+               device: Optional[torch.device] = None,
+               seed:int = None):
     self.data = data
     self.num_neighbors = num_neighbors
     self.max_input_size = 0
     self.with_edge = with_edge
     self.with_neg = with_neg
+    self.with_weight = with_weight
     self.edge_dir = edge_dir
     self.collect_features = collect_features
     self.channel = channel
     self.concurrency = concurrency
     self.device = get_available_device(device)
+    self.seed = seed
 
     if isinstance(data, DistDataset):
       partition2workers = rpc_sync_data_partitions(
@@ -163,7 +172,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
 
     self.sampler = NeighborSampler(
       self.dist_graph.local_graph, self.num_neighbors,
-      self.device, self.with_edge, self.with_neg, self.edge_dir
+      self.device, self.with_edge, self.with_neg, self.with_weight, 
+      self.edge_dir, seed=self.seed
     )
     self.inducer_pool = queue.Queue(maxsize=self.concurrency)
 
@@ -283,12 +293,12 @@ class DistNeighborSampler(ConcurrentEventLoop):
           req_num = self.num_neighbors[etype][i]
           if self.edge_dir == 'in':
             srcs = src_dict.get(etype[-1], None)
-            if srcs is not None:
+            if srcs is not None and srcs.numel() > 0:
               task_dict[reverse_edge_type(etype)] = self._loop.create_task(
                 self._sample_one_hop(srcs, req_num, etype))
           elif self.edge_dir == 'out':
             srcs = src_dict.get(etype[0], None)
-            if srcs is not None:
+            if srcs is not None and srcs.numel() > 0:
               task_dict[etype] = self._loop.create_task(
                 self._sample_one_hop(srcs, req_num, etype))
 

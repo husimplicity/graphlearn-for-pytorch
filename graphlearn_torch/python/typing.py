@@ -17,7 +17,7 @@ from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import torch
 import numpy as np
-
+from enum import Enum
 
 # Types for basic graph entity #################################################
 
@@ -45,8 +45,17 @@ def reverse_edge_type(etype: EdgeType):
       edge = 'rev_' + edge
   return (dst, edge, src)
 
+
 # A representation of tensor data
 TensorDataType = Union[torch.Tensor, np.ndarray]
+
+NodeLabel = Union[TensorDataType, Dict[NodeType, TensorDataType]]
+NodeIndex = Union[TensorDataType, Dict[NodeType, TensorDataType]]
+
+class Split(Enum):
+  train = 'train'
+  valid = 'valid'
+  test = 'test'
 
 # Types for partition data #####################################################
 
@@ -57,6 +66,8 @@ class GraphPartitionData(NamedTuple):
   edge_index: Tuple[torch.Tensor, torch.Tensor]
   # edge ids tensor corresponding to `edge_index`
   eids: torch.Tensor
+  # weights tensor corresponding to `edge_index`
+  weights: Optional[torch.Tensor] = None
 
 class FeaturePartitionData(NamedTuple):
   r""" Data and indexing info of a node/edge feature partition.
@@ -81,7 +92,8 @@ HeteroEdgePartitionDict = Dict[EdgeType, PartitionBook]
 
 # Types for neighbor sampling ##################################################
 
-InputNodes = Union[torch.Tensor, NodeType, Tuple[NodeType, torch.Tensor]]
+Seeds = Union[torch.Tensor, str] 
+InputNodes = Union[Seeds, NodeType, Tuple[NodeType, Seeds], Tuple[NodeType, List[Seeds]]]
 EdgeIndexTensor = Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]
 InputEdges = Union[EdgeIndexTensor, EdgeType, Tuple[EdgeType, EdgeIndexTensor]]
 NumNeighbors = Union[List[int], Dict[EdgeType, List[int]]]

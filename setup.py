@@ -13,11 +13,13 @@
 # limitations under the License.
 # =============================================================================
 
-import glob
 import os
-
-from setuptools import setup, find_packages
-from torch.utils import cpp_extension
+import sys
+from torch.utils.cpp_extension import BuildExtension
+from setuptools import setup
+import torch
+import subprocess
+import re
 
 # This version string should be updated when releasing a new version.
 _VERSION = '0.2.1'
@@ -31,6 +33,7 @@ WITH_GART = os.getenv('WITH_GART', 'OFF')
 WITH_GRIN = os.getenv('WITH_GRIN', 'OFF')
 WITH_GAR = os.getenv('WITH_GAR', 'OFF')
 
+<<<<<<< HEAD
 extensions = []
 include_dirs=[]
 library_dirs=[]
@@ -190,6 +193,48 @@ extensions.append(cpp_extension.CppExtension(
   undef_macros=undef_macros,
 ))
 
+=======
+sys.path.append(os.path.join(ROOT_PATH, 'graphlearn_torch', 'python', 'utils'))
+from build import glt_ext_module, glt_v6d_ext_module
+
+GLT_V6D_EXT_NAME = "py_graphlearn_torch_vineyard"
+GLT_EXT_NAME = "py_graphlearn_torch"
+
+def get_gcc_use_cxx_abi():
+    output = subprocess.run("cmake .", capture_output=True, text=True, shell=True)
+    print('output', str(output))
+    match = re.search(r"GCC_USE_CXX11_ABI: (\d)", str(output))
+    if match:
+        return match.group(1)
+    else:
+        return None
+  
+GCC_USE_CXX11_ABI = get_gcc_use_cxx_abi()
+
+class CustomizedBuildExtension(BuildExtension):
+  def _add_gnu_cpp_abi_flag(self, extension):
+    gcc_use_cxx_abi = GCC_USE_CXX11_ABI if extension.name == GLT_V6D_EXT_NAME else str(int(torch._C._GLIBCXX_USE_CXX11_ABI))
+    print('GCC_USE_CXX11_ABI for {}: {}', extension.name, gcc_use_cxx_abi)
+    self._add_compile_flag(extension, '-D_GLIBCXX_USE_CXX11_ABI=' + gcc_use_cxx_abi) 
+        
+
+ext_modules = [
+  glt_ext_module(
+    name=GLT_EXT_NAME,
+    root_path=ROOT_PATH,
+    with_cuda=WITH_CUDA == "ON",
+    release=RELEASE == "TRUE"
+  )
+]
+
+if WITH_VINEYARD == "ON":
+  ext_modules.append(
+    glt_v6d_ext_module(
+      name=GLT_V6D_EXT_NAME,
+      root_path=ROOT_PATH,      
+    ),
+  )
+>>>>>>> main
 
 setup(
   name='graphlearn-torch',
@@ -199,11 +244,12 @@ setup(
   url="https://github.com/alibaba/graphlearn-for-pytorch",
   python_requires='>=3.6',
   requires=['torch'],
-  cmdclass={'build_ext': cpp_extension.BuildExtension},
+  cmdclass={'build_ext': CustomizedBuildExtension},
   ext_package='graphlearn_torch',
-  ext_modules=extensions,
-  package_dir={'graphlearn_torch' : 'graphlearn_torch/python'},
+  ext_modules=ext_modules,
+  package_dir={'graphlearn_torch': 'graphlearn_torch/python'},
   packages=[
+<<<<<<< HEAD
     'graphlearn_torch',
     'graphlearn_torch.channel',
     'graphlearn_torch.data',
@@ -213,5 +259,11 @@ setup(
     'graphlearn_torch.sampler',
     'graphlearn_torch.utils',
     'graphlearn_torch.data.grin'
+=======
+    'graphlearn_torch', 'graphlearn_torch.channel', 'graphlearn_torch.data',
+    'graphlearn_torch.distributed', 'graphlearn_torch.loader',
+    'graphlearn_torch.partition', 'graphlearn_torch.sampler',
+    'graphlearn_torch.utils'
+>>>>>>> main
   ]
 )

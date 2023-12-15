@@ -29,18 +29,25 @@ from torch.nn.parallel import DistributedDataParallel
 from rgnn import RGNN
 
 
-torch.manual_seed(42)
-
-
-def evaluate(model, dataloader):
+def evaluate(model, dataloader, current_device, use_fp16):
   predictions = []
   labels = []
   with torch.no_grad():
-    for batch in dataloader:
+    for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
-      labels.append(batch['paper'].y[:batch_size].cpu().numpy())
-      predictions.append(out.argmax(1).cpu().numpy())
+      if use_fp16:
+        x_dict = {node_name: node_feat.to(current_device).to(torch.float32)
+                  for node_name, node_feat in batch.x_dict.items()}
+      else:
+        x_dict = {node_name: node_feat.to(current_device)
+                  for node_name, node_feat in batch.x_dict.items()}
+      out = model(x_dict,
+                  batch.edge_index_dict,
+                  num_sampled_nodes_dict=batch.num_sampled_nodes,
+                  num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
+      batch_size = min(out.shape[0], batch_size)
+      labels.append(batch['paper'].y[:batch_size].cpu().clone().numpy())
+      predictions.append(out.argmax(1).cpu().clone().numpy())
 
     predictions = np.concatenate(predictions)
     labels = np.concatenate(labels)
@@ -48,16 +55,16 @@ def evaluate(model, dataloader):
     return acc
 
 def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
-    hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
-    epochs, batch_size, learning_rate, log_every,
-    dataset, train_idx, val_idx, test_idx,
+    split_training_sampling, hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
+    epochs, batch_size, learning_rate, log_every, random_seed,
+    dataset, train_idx, val_idx,
     master_addr,
     training_pg_master_port,
     train_loader_master_port,
     val_loader_master_port,
-    test_loader_master_port,
-    with_gpu, edge_dir,
-    rpc_timeout):
+    with_gpu, trim_to_layer, use_fp16,
+    edge_dir, rpc_timeout):
+  glt.utils.common.seed_everything(random_seed)
   # Initialize graphlearn_torch distributed worker group context.
   glt.distributed.init_worker_group(
     world_size=num_nodes*num_training_procs,
@@ -67,13 +74,20 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   current_ctx = glt.distributed.get_context()
   if with_gpu:
-    current_device = torch.device(local_proc_rank % torch.cuda.device_count())
+    if split_training_sampling:
+      current_device = torch.device((local_proc_rank * 2) % torch.cuda.device_count())
+      sampling_device = torch.device((local_proc_rank * 2 + 1) % torch.cuda.device_count())
+    else:
+      current_device = torch.device(local_proc_rank % torch.cuda.device_count())
+      sampling_device = current_device
   else:
     current_device = torch.device('cpu')
+    sampling_device = current_device
 
   # Initialize training process group of PyTorch.
   torch.distributed.init_process_group(
     backend='nccl' if with_gpu else 'gloo',
+    timeout=datetime.timedelta(seconds=rpc_timeout),
     rank=current_ctx.rank,
     world_size=current_ctx.world_size,
     init_method='tcp://{}:{}'.format(master_addr, training_pg_master_port)
@@ -91,15 +105,17 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
+    random_seed=random_seed,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
-      worker_devices=[current_device],
-      worker_concurrency=2,
+      worker_devices=sampling_device,
+      worker_concurrency=4,
       master_addr=master_addr,
       master_port=train_loader_master_port,
-      channel_size='2GB',
+      channel_size='16GB',
       pin_memory=True,
       rpc_timeout=rpc_timeout,
+      num_rpc_threads=2
     )
   )
   # Create distributed neighbor loader for validation.
@@ -113,28 +129,17 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
-    worker_options = glt.distributed.CollocatedDistSamplingWorkerOptions(
+    random_seed=random_seed,
+    worker_options = glt.distributed.MpDistSamplingWorkerOptions(
+      num_workers=1,
+      worker_devices=sampling_device,
+      worker_concurrency=4,
       master_addr=master_addr,
       master_port=val_loader_master_port,
+      channel_size='16GB',
+      pin_memory=True,
       rpc_timeout=rpc_timeout,
-    )
-  )
-
-  # Create distributed neighbor loader for testing.
-  test_idx = test_idx.split(test_idx.size(0) // num_training_procs)[local_proc_rank]
-  test_loader = glt.distributed.DistNeighborLoader(
-    data=dataset,
-    num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
-    input_nodes=('paper', test_idx),
-    batch_size=batch_size,
-    shuffle=False,
-    edge_dir=edge_dir,
-    collect_features=True,
-    to_device=current_device,
-    worker_options = glt.distributed.CollocatedDistSamplingWorkerOptions(
-      master_addr=master_addr,
-      master_port=test_loader_master_port,
-      rpc_timeout=rpc_timeout,
+      num_rpc_threads=2
     )
   )
 
@@ -149,7 +154,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
                dropout=0.2,
                model=model_type,
                heads=num_heads,
-               node_type='paper').to(current_device)
+               node_type='paper',
+               with_trim=trim_to_layer).to(current_device)
   model = DistributedDataParallel(model,
                                   device_ids=[current_device.index] if with_gpu else None,
                                   find_unused_parameters=True)
@@ -169,17 +175,27 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   best_accuracy = 0
   training_start = time.time()
-  for epoch in tqdm.tqdm(range(epochs)):
+  for epoch in range(epochs):
     model.train()
     total_loss = 0
     train_acc = 0
     idx = 0
     gpu_mem_alloc = 0
     epoch_start = time.time()
-    for batch in train_loader:
+    for batch in tqdm.tqdm(train_loader):
       idx += 1
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      if use_fp16:
+        x_dict = {node_name: node_feat.to(current_device).to(torch.float32)
+                  for node_name,node_feat in batch.x_dict.items()}
+      else:
+        x_dict = {node_name: node_feat.to(current_device)
+                  for node_name,node_feat in batch.x_dict.items()}
+      out = model(x_dict,
+                  batch.edge_index_dict,
+                  num_sampled_nodes_dict=batch.num_sampled_nodes,
+                  num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
+      batch_size = min(batch_size, out.shape[0])
       y = batch['paper'].y[:batch_size]
       loss = loss_fcn(out, y)
       optimizer.zero_grad()
@@ -197,15 +213,15 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     gpu_mem_alloc /= idx
     if with_gpu:
       torch.cuda.synchronize()
-      torch.distributed.barrier()
+    torch.distributed.barrier()
     if epoch%log_every == 0:
       model.eval()
-      val_acc = evaluate(model, val_loader).item()*100
+      val_acc = evaluate(model, val_loader, current_device, use_fp16).item()*100
       if best_accuracy < val_acc:
         best_accuracy = val_acc
       if with_gpu:
         torch.cuda.synchronize()
-        torch.distributed.barrier()
+      torch.distributed.barrier()
       tqdm.tqdm.write(
           "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
               current_ctx.rank,
@@ -217,10 +233,6 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
               gpu_mem_alloc
           )
       )
-
-  model.eval()
-  test_acc = evaluate(model, test_loader).item()*100
-  print("Rank {:02d} Test Acc {:.2f}%".format(current_ctx.rank, test_acc))
   print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
 
 
@@ -233,7 +245,7 @@ if __name__ == '__main__':
   parser.add_argument('--dataset_size', type=str, default='tiny',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
-  parser.add_argument('--num_classes', type=int, default=19,
+  parser.add_argument('--num_classes', type=int, default=2983,
       choices=[19, 2983], help='number of classes')
   parser.add_argument('--in_memory', type=int, default=0,
       choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')
@@ -241,14 +253,15 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='10,15')
+  parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--batch_size', type=int, default=512)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=int, default=0.001)
+  parser.add_argument('--learning_rate', type=float, default=0.001)
   parser.add_argument('--epochs', type=int, default=20)
-  parser.add_argument('--num_layers', type=int, default=6)
+  parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
-  parser.add_argument('--log_every', type=int, default=5)
+  parser.add_argument('--log_every', type=int, default=2)
+  parser.add_argument('--random_seed', type=int, default=42)
   # Distributed settings.
   parser.add_argument("--num_nodes", type=int, default=2,
       help="Number of distributed nodes.")
@@ -264,19 +277,29 @@ if __name__ == '__main__':
       help="The port used for RPC initialization across all sampling workers of train loader.")
   parser.add_argument("--val_loader_master_port", type=int, default=12113,
       help="The port used for RPC initialization across all sampling workers of val loader.")
-  parser.add_argument("--test_loader_master_port", type=int, default=12114,
-      help="The port used for RPC initialization across all sampling workers of test loader.")
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='out',
       help="sampling direction, can be 'in' for 'by_dst' or 'out' for 'by_src' for partitions.")
+  parser.add_argument('--layout', type=str, default='COO',
+      help="Layout of input graph: CSC, CSR, COO. Default is COO.")
   parser.add_argument("--rpc_timeout", type=int, default=180,
-                      help="rpc timeout in seconds")
+      help="rpc timeout in seconds")
+  parser.add_argument("--split_training_sampling", action="store_true",
+      help="Use seperate GPUs for training and sampling processes.")
+  parser.add_argument("--with_trim", action="store_true",
+      help="use trim_to_layer function from pyG")
+  parser.add_argument("--use_fp16", action="store_true",
+      help="load node/edge feature using fp16 format to reduce memory usage")
   args = parser.parse_args()
+  assert args.layout in ['COO', 'CSC', 'CSR']
+  glt.utils.common.seed_everything(args.random_seed)
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   if args.with_gpu:
     assert(not args.num_training_procs > torch.cuda.device_count())
+    if args.split_training_sampling:
+      assert(not args.num_training_procs > torch.cuda.device_count() // 2)
 
   print('--- Loading data partition ...\n')
   data_pidx = args.node_rank % args.num_nodes
@@ -285,6 +308,7 @@ if __name__ == '__main__':
     root_dir=osp.join(args.path, f'{args.dataset_size}-partitions'),
     partition_idx=data_pidx,
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
+    input_layout = args.layout,
     feature_with_gpu=args.with_gpu,
     whole_node_label_file={'paper': osp.join(args.path, f'{args.dataset_size}-label', 'label.pt')}
   )
@@ -294,26 +318,23 @@ if __name__ == '__main__':
   val_idx = torch.load(
     osp.join(args.path, f'{args.dataset_size}-val-partitions', f'partition{data_pidx}.pt')
   )
-  test_idx = torch.load(
-    osp.join(args.path, f'{args.dataset_size}-test-partitions', f'partition{data_pidx}.pt')
-  )
   train_idx.share_memory_()
   val_idx.share_memory_()
-  test_idx.share_memory_()
 
   print('--- Launching training processes ...\n')
   torch.multiprocessing.spawn(
     run_training_proc,
-    args=(args.num_nodes, args.node_rank, args.num_training_procs,
+    args=(args.num_nodes, args.node_rank, args.num_training_procs, args.split_training_sampling,
           args.hidden_channels, args.num_classes, args.num_layers, args.model, args.num_heads, args.fan_out,
-          args.epochs, args.batch_size, args.learning_rate, args.log_every,
-          dataset, train_idx, val_idx, test_idx,
+          args.epochs, args.batch_size, args.learning_rate, args.log_every, args.random_seed,
+          dataset, train_idx, val_idx,
           args.master_addr,
           args.training_pg_master_port,
           args.train_loader_master_port,
           args.val_loader_master_port,
-          args.test_loader_master_port,
           args.with_gpu,
+          args.with_trim,
+          args.use_fp16,
           args.edge_dir,
           args.rpc_timeout),
     nprocs=args.num_training_procs,

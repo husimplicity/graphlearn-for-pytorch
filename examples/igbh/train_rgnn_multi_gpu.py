@@ -28,16 +28,21 @@ from torch.nn.parallel import DistributedDataParallel
 from dataset import IGBHeteroDataset
 from rgnn import RGNN
 
-torch.manual_seed(42)
 warnings.filterwarnings("ignore")
 
-def evaluate(model, dataloader):
+def evaluate(model, dataloader, current_device):
   predictions = []
   labels = []
   with torch.no_grad():
     for batch in dataloader:
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      out = model(
+        {
+          node_name: node_feat.to(current_device).to(torch.float32)
+          for node_name, node_feat in batch.x_dict.items()
+        },  
+        batch.edge_index_dict
+      )[:batch_size]
       labels.append(batch['paper'].y[:batch_size].cpu().numpy())
       predictions.append(out.argmax(1).cpu().numpy())
 
@@ -48,16 +53,16 @@ def evaluate(model, dataloader):
 
 def run_training_proc(rank, world_size,
     hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
-    epochs, batch_size, learning_rate, log_every,
-    dataset, train_idx, val_idx, test_idx, with_gpu):
+    epochs, batch_size, learning_rate, log_every, random_seed,
+    dataset, train_idx, val_idx, with_gpu):
   
   os.environ['MASTER_ADDR'] = 'localhost'
   os.environ['MASTER_PORT'] = '12355'
   dist.init_process_group('nccl', rank=rank, world_size=world_size)
   torch.cuda.set_device(rank)
-  torch.manual_seed(42)
+  glt.utils.common.seed_everything(random_seed)
   current_device =torch.device(rank)
-
+  
   print(f'Rank {rank} init graphlearn_torch NeighborLoader...')
   # Create rank neighbor loader for training
   train_idx = train_idx.split(train_idx.size(0) // world_size)[rank]
@@ -68,7 +73,8 @@ def run_training_proc(rank, world_size,
     batch_size=batch_size,
     shuffle=True,
     drop_last=False,
-    device=current_device
+    device=current_device,
+    seed=random_seed
   )
 
   # Create rank neighbor loader for validation.
@@ -80,19 +86,8 @@ def run_training_proc(rank, world_size,
     batch_size=batch_size,
     shuffle=True,
     drop_last=False,
-    device=current_device
-  )
-
-  # Create rank neighbor loader for testing.
-  test_idx = test_idx.split(test_idx.size(0) // world_size)[rank]
-  test_loader = glt.loader.NeighborLoader(
-    data=dataset,
-    num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
-    input_nodes=('paper', test_idx),
-    batch_size=batch_size,
-    shuffle=True,
-    drop_last=False,
-    device=current_device
+    device=current_device,
+    seed=random_seed
   )
 
   # Define model and optimizer.
@@ -134,7 +129,13 @@ def run_training_proc(rank, world_size,
     for batch in train_loader:
       idx += 1
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      out = model(
+        {
+          node_name: node_feat.to(current_device).to(torch.float32)
+          for node_name, node_feat in batch.x_dict.items()
+        },  
+        batch.edge_index_dict
+      )[:batch_size]
       y = batch['paper'].y[:batch_size]
       loss = loss_fcn(out, y)
       optimizer.zero_grad()
@@ -152,15 +153,15 @@ def run_training_proc(rank, world_size,
     gpu_mem_alloc /= idx
     if with_gpu:
       torch.cuda.synchronize()
-      dist.barrier()
+    dist.barrier()
     if epoch%log_every == 0:
       model.eval()
-      val_acc = evaluate(model, val_loader).item()*100
+      val_acc = evaluate(model, val_loader, current_device).item()*100
       if best_accuracy < val_acc:
         best_accuracy = val_acc
       if with_gpu:
         torch.cuda.synchronize()
-        dist.barrier()
+      dist.barrier()
       tqdm.tqdm.write(
           "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
               rank,
@@ -172,10 +173,6 @@ def run_training_proc(rank, world_size,
               gpu_mem_alloc
           )
       )
-
-  model.eval()
-  test_acc = evaluate(model, test_loader).item()*100
-  print("Rank {:02d} Test Acc {:.2f}%".format(rank, test_acc))
   print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
 
 
@@ -188,7 +185,7 @@ if __name__ == '__main__':
   parser.add_argument('--dataset_size', type=str, default='tiny',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
-  parser.add_argument('--num_classes', type=int, default=19,
+  parser.add_argument('--num_classes', type=int, default=2983,
       choices=[19, 2983], help='number of classes')
   parser.add_argument('--in_memory', type=int, default=1,
       choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')
@@ -196,38 +193,49 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='10,10')
-  parser.add_argument('--batch_size', type=int, default=5120)
+  parser.add_argument('--fan_out', type=str, default='15,10,5')
+  parser.add_argument('--batch_size', type=int, default=1024)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=int, default=0.01)
-  parser.add_argument('--epochs', type=int, default=20)
+  parser.add_argument('--learning_rate', type=float, default=0.01)
+  parser.add_argument('--epochs', type=int, default=1)
   parser.add_argument('--num_layers', type=int, default=2)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=5)
+  parser.add_argument('--random_seed', type=int, default=42)
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='in')
+  parser.add_argument('--layout', type=str, default='COO',
+      help="Layout of input graph. Default is COO.")
+  parser.add_argument("--pin_feature", action="store_true",
+      help="Pin the feature in host memory. Default is False.")
+  parser.add_argument("--use_fp16", action="store_true", 
+      help="To use FP16 for loading the features. Default is False.")
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
-
+  assert args.layout in ['COO', 'CSC', 'CSR']
+  glt.utils.common.seed_everything(args.random_seed)
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
-                                  args.num_classes==2983)
+                                  args.num_classes==2983, True, args.layout, args.use_fp16)
+
   # init graphlearn_torch Dataset.
   glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
-  glt_dataset.init_graph(
-    edge_index=igbh_dataset.edge_dict,
-    graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
-  )
 
   glt_dataset.init_node_features(
     node_feature_data=igbh_dataset.feat_dict,
-    with_gpu=True
+    with_gpu=args.with_gpu and args.pin_feature
   )
+
+  glt_dataset.init_graph(
+    edge_index=igbh_dataset.edge_dict,
+    layout = args.layout,
+    graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
+  )
+  
   glt_dataset.init_node_labels(node_label_data={'paper': igbh_dataset.label})
 
-  train_idx = igbh_dataset.train_idx.share_memory_()
-  val_idx = igbh_dataset.val_idx.share_memory_()
-  test_idx = igbh_dataset.test_idx.share_memory_()
+  train_idx = igbh_dataset.train_idx.clone().share_memory_()
+  val_idx = igbh_dataset.val_idx.clone().share_memory_()
   
   print('--- Launching training processes ...\n')
   world_size = torch.cuda.device_count()
@@ -235,8 +243,8 @@ if __name__ == '__main__':
     run_training_proc,
     args=(world_size, args.hidden_channels, args.num_classes, args.num_layers, 
           args.model, args.num_heads, args.fan_out, args.epochs, args.batch_size,
-          args.learning_rate, args.log_every,
-          glt_dataset, train_idx, val_idx, test_idx, args.with_gpu),
+          args.learning_rate, args.log_every, args.random_seed,
+          glt_dataset, train_idx, val_idx, args.with_gpu),
     nprocs=world_size,
     join=True
   )

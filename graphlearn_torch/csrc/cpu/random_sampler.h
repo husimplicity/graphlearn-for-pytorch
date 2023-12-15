@@ -18,6 +18,7 @@ limitations under the License.
 
 #include "graphlearn_torch/include/sampler.h"
 
+
 namespace graphlearn_torch {
 
 class CPURandomSampler : public Sampler {
@@ -51,6 +52,7 @@ private:
   void UniformSample(const int64_t* col_begin, const int64_t* col_end,
       const int64_t* eid_begin, const int64_t* eid_end,
       const int32_t req_num, int64_t* out_nbrs, int64_t* out_eid);
+
 };
 
 } // namespace graphlearn_torch

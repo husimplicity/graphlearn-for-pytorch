@@ -21,7 +21,7 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union, Literal
 
 import torch
 
-from ..typing import NodeType, EdgeType, NumNeighbors
+from ..typing import NodeType, EdgeType, NumNeighbors, Split
 from ..utils import CastMixin
 
 
@@ -349,7 +349,9 @@ class SamplingConfig:
   with_edge: bool
   collect_features: bool
   with_neg: bool
+  with_weight: bool
   edge_dir: Literal['in', 'out']
+  seed: int
 
 
 class BaseSampler(ABC):
@@ -405,3 +407,58 @@ class BaseSampler(ABC):
       and a mapping from indices in `inputs` to new indices in output nodes,
       i.e. nodes[mapping] = inputs.
     """
+
+class RemoteSamplerInput(ABC):
+  """A base class that provides the `to_local_sampler_input` method for the server
+  to obtain the sampler input.
+  """
+  
+  @abstractmethod
+  def to_local_sampler_input(
+    self,
+    dataset,
+    **kwargs
+  ) -> Union[NodeSamplerInput, EdgeSamplerInput]:
+    r"""
+    Abstract method to convert the sampler input to local format.
+    """
+
+
+class RemoteNodePathSamplerInput(RemoteSamplerInput):
+  r"""RemoteNodePathSamplerInput passes the node path to the server, where the server
+  can load node seeds from it.
+  """
+  def __init__(self, node_path: str, input_type: str ) -> None:
+    self.node_path = node_path
+    self.input_type = input_type
+
+  def to_local_sampler_input(
+    self,
+    dataset,
+    **kwargs,
+  ) -> NodeSamplerInput:
+    node = torch.load(self.node_path)
+    return NodeSamplerInput(node=node, input_type=self.input_type)
+
+class RemoteNodeSplitSamplerInput(RemoteSamplerInput):
+  r"""RemoteNodeSplitSamplerInput passes the split category to the server and the server 
+  loads seeds from the dataset.
+  """
+  def __init__(self, split: Split, input_type: str ) -> None:
+    self.split = split
+    self.input_type = input_type
+
+  def to_local_sampler_input(
+    self,
+    dataset,
+    **kwargs,
+  ) -> NodeSamplerInput:
+    if self.split == Split.train:
+      idx = dataset.train_idx
+    elif self.split == Split.valid:
+      idx = dataset.val_idx
+    elif self.split == Split.test:
+      idx = dataset.test_idx 
+    if isinstance(idx, dict):
+      idx = idx[self.input_type]
+    return NodeSamplerInput(node=idx, input_type=self.input_type)

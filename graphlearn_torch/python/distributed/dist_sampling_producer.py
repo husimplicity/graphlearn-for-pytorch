@@ -28,7 +28,9 @@ from ..sampler import (
   NodeSamplerInput, EdgeSamplerInput, SamplingType, SamplingConfig
 )
 from ..utils import ensure_device
+from ..utils import seed_everything
 
+from ..distributed.dist_context import get_context
 from .dist_context import init_worker_group
 from .dist_dataset import DistDataset
 from .dist_neighbor_sampler import DistNeighborSampler
@@ -57,6 +59,7 @@ def _sampling_worker_loop(rank,
                           worker_options: _BasicDistSamplingWorkerOptions,
                           channel: ChannelBase,
                           task_queue: mp.Queue,
+                          sampling_completed_worker_count: mp.Value,
                           mp_barrier):
   r""" Subprocess work loop for sampling worker.
   """
@@ -86,11 +89,13 @@ def _sampling_worker_loop(rank,
       rpc_timeout=worker_options.rpc_timeout
     )
 
+    if sampling_config.seed is not None:
+      seed_everything(sampling_config.seed)
     dist_sampler = DistNeighborSampler(
       data, sampling_config.num_neighbors, sampling_config.with_edge,
-      sampling_config.with_neg, sampling_config.edge_dir,
-      sampling_config.collect_features, channel,
-      worker_options.worker_concurrency, current_device
+      sampling_config.with_neg, sampling_config.with_weight,
+      sampling_config.edge_dir, sampling_config.collect_features, channel,
+      worker_options.worker_concurrency, current_device, seed=sampling_config.seed
     )
     dist_sampler.start_loop()
 
@@ -132,6 +137,10 @@ def _sampling_worker_loop(rank,
             dist_sampler.subgraph(sampler_input[index])
 
         dist_sampler.wait_all()
+
+        with sampling_completed_worker_count.get_lock():
+          sampling_completed_worker_count.value += 1 # non-atomic, lock is necessary
+
       elif command == MpCommand.STOP:
         keep_running = False
       else:
@@ -165,6 +174,9 @@ class DistMpSamplingProducer(object):
     self.worker_options._assign_worker_devices()
     self.num_workers = self.worker_options.num_workers
     self.output_channel = output_channel
+    self.sampling_completed_worker_count = mp.Value('I', lock=True)
+    current_ctx = get_context()
+    self.worker_options._set_worker_ranks(current_ctx)  
 
     self._task_queues = []
     self._workers = []
@@ -175,6 +187,8 @@ class DistMpSamplingProducer(object):
   def init(self):
     r""" Create the subprocess pool. Init samplers and rpc server.
     """
+    if self.sampling_config.seed is not None:
+      seed_everything(self.sampling_config.seed)
     if not self.sampling_config.shuffle:
       unshuffled_indexes = self._get_seeds_indexes()
     else:
@@ -190,7 +204,7 @@ class DistMpSamplingProducer(object):
         target=_sampling_worker_loop,
         args=(rank, self.data, self.sampler_input, unshuffled_indexes[rank],
               self.sampling_config, self.worker_options, self.output_channel,
-              task_queue, barrier)
+              task_queue, self.sampling_completed_worker_count, barrier)
       )
       w.daemon = True
       w.start()
@@ -220,12 +234,22 @@ class DistMpSamplingProducer(object):
     """
     if self.sampling_config.shuffle:
       seeds_indexes = self._get_seeds_indexes()
+      for rank in range(self.num_workers):
+        seeds_indexes[rank].share_memory_()
     else:
       seeds_indexes = [None] * self.num_workers
 
+    self.sampling_completed_worker_count.value = 0
     for rank in range(self.num_workers):
       self._task_queues[rank].put((MpCommand.SAMPLE_ALL, seeds_indexes[rank]))
     time.sleep(0.1)
+
+  def is_all_sampling_completed_and_consumed(self):
+    if self.output_channel.empty():
+      return self.is_all_sampling_completed()
+ 
+  def is_all_sampling_completed(self):
+    return self.sampling_completed_worker_count.value == self.num_workers
 
   def _get_worker_seeds_ranges(self):
     num_worker_batches = [0] * self.num_workers
@@ -305,8 +329,10 @@ class DistCollocatedSamplingProducer(object):
     self._collocated_sampler = DistNeighborSampler(
       self.data, self.sampling_config.num_neighbors,
       self.sampling_config.with_edge, self.sampling_config.with_neg,
+      self.sampling_config.with_weight,
       self.sampling_config.edge_dir, self.sampling_config.collect_features,
-      channel=None, concurrency=1, device=self.device
+      channel=None, concurrency=1, device=self.device, 
+      seed=self.sampling_config.seed
     )
     self._collocated_sampler.start_loop()
 

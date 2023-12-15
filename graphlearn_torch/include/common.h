@@ -16,18 +16,12 @@ limitations under the License.
 #ifndef GRAPHLEARN_TORCH_INCLUDE_COMMON_H_
 #define GRAPHLEARN_TORCH_INCLUDE_COMMON_H_
 
+#include <random>
 #include <stdexcept>
 
 namespace graphlearn_torch
 {
-
-enum class DataType {
-  Int32 = 0,
-  Int64 = 1,
-  Float32 = 2,
-  Float64 = 3
-};
-
+  
 inline void Check(bool val, const char* err_msg) {
   if (val) { return; }
   throw std::runtime_error(err_msg);
@@ -38,6 +32,38 @@ inline void CheckEq(const T &x, const T &y) {
   if (x == y) { return; }
   throw std::runtime_error(std::string("CheckEq failed"));
 }
+
+class RandomSeedManager {
+public:
+    static RandomSeedManager& getInstance() {
+        static RandomSeedManager instance;
+        return instance;
+    }
+
+    void setSeed(uint32_t seed) {
+      this->is_set = true;
+      this->seed = seed;  
+    }
+
+    uint32_t getSeed() const {
+      if (this->is_set) {
+        return seed;
+      }
+      else {
+        std::random_device rd;
+        return rd();
+      }
+    }
+
+private:
+    RandomSeedManager() {} // Constructor is private
+    RandomSeedManager(RandomSeedManager const&) = delete; // Prevent copies
+    void operator=(RandomSeedManager const&) = delete; // Prevent assignments
+
+    uint32_t seed;
+    bool is_set = false;
+};
+
 
 }  // namespace graphlearn_torch
 

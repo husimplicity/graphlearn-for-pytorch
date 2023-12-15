@@ -15,11 +15,12 @@
 
 import logging
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union, Literal
+from typing import Dict, List, Optional, Union, Literal, Tuple
+from enum import Enum
 
 import torch
 
-from ..typing import NodeType, EdgeType, TensorDataType
+from ..typing import NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex
 from ..utils import convert_to_tensor, share_memory, squeeze
 
 from .feature import DeviceGroup, Feature
@@ -34,8 +35,9 @@ class Dataset(object):
     graph: Union[Graph, Dict[EdgeType, Graph]] = None,
     node_features: Union[Feature, Dict[NodeType, Feature]] = None,
     edge_features: Union[Feature, Dict[EdgeType, Feature]] = None,
-    node_labels: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
-    edge_dir: Literal['in', 'out'] = 'out'
+    node_labels: NodeLabel = None,
+    edge_dir: Literal['in', 'out'] = 'out',
+    node_split: Tuple[NodeIndex, NodeIndex, NodeIndex] = None,
   ):
     self.graph = graph
     self.node_features = node_features
@@ -43,10 +45,16 @@ class Dataset(object):
     self.node_labels = squeeze(convert_to_tensor(node_labels))
     self.edge_dir = edge_dir
 
+    if node_split is not None:
+      self.train_idx, self.val_idx, self.test_idx = squeeze(convert_to_tensor(node_split))
+    else:
+      self.train_idx, self.val_idx, self.test_idx = None, None, None
+
   def init_graph(
     self,
     edge_index: Union[TensorDataType, Dict[EdgeType, TensorDataType]] = None,
     edge_ids: Union[TensorDataType, Dict[EdgeType, TensorDataType]] = None,
+    edge_weights: Union[TensorDataType, Dict[EdgeType, TensorDataType]] = None,
     layout: Union[str, Dict[EdgeType, str]] = 'COO',
     graph_mode: str = 'ZERO_COPY',
     directed: bool = False,
@@ -61,6 +69,9 @@ class Dataset(object):
       edge_ids (torch.Tensor or numpy.ndarray): Edge ids for graph edges, A
         CPU tensor (homo) or a Dict[EdgeType, torch.Tensor](hetero).
         (default: ``None``)
+      edge_weights (torch.Tensor or numpy.ndarray): Edge weights for graph edges,
+        A CPU tensor (homo) or a Dict[EdgeType, torch.Tensor](hetero).
+        (default: ``None``)
       layout (str): The edge layout representation for the input edge index,
         should be 'COO', 'CSR' or 'CSC'. (default: 'COO')
       graph_mode (str): Mode in graphlearn_torch's ``Graph``, 'CPU', 'ZERO_COPY'
@@ -72,6 +83,7 @@ class Dataset(object):
     """
     edge_index = convert_to_tensor(edge_index, dtype=torch.int64)
     edge_ids = convert_to_tensor(edge_ids, dtype=torch.int64)
+    edge_weights = convert_to_tensor(edge_weights, dtype=torch.float)
     self._directed = directed
 
     if edge_index is not None:
@@ -81,6 +93,10 @@ class Dataset(object):
           assert isinstance(edge_ids, dict)
         else:
           edge_ids = {}
+        if edge_weights is not None:
+          assert isinstance(edge_weights, dict)
+        else:
+          edge_weights = {}
         if not isinstance(layout, dict):
           layout = {etype: layout for etype in edge_index.keys()}
         topo_dict = {}
@@ -89,6 +105,7 @@ class Dataset(object):
           topo_dict[etype] = Topology(
             edge_index=e_idx,
             edge_ids=edge_ids.get(etype, None),
+            edge_weights=edge_weights.get(etype, None),
             input_layout=layout[etype],
             layout='CSR' if self.edge_dir == 'out' else 'CSC',
           )
@@ -99,9 +116,112 @@ class Dataset(object):
           self.graph[etype] = g
       else:
         # homogeneous.
-        topo = Topology(edge_index, edge_ids, input_layout=layout, layout='CSR' if self.edge_dir == 'out' else 'CSC')
+        topo = Topology(edge_index, edge_ids, edge_weights, input_layout=layout,
+                        layout='CSR' if self.edge_dir == 'out' else 'CSC')
         self.graph = Graph(topo, graph_mode, device)
         self.graph.lazy_init()
+
+  def random_node_split(
+    self,
+    num_val: Union[float, int],
+    num_test: Union[float, int],
+  ):
+    r"""Performs a node-level random split by adding :obj:`train_idx`,
+    :obj:`val_idx` and :obj:`test_idx` attributes to the
+    :class:`~graphlearn_torch.data.Dataset` object. All nodes except 
+    those in the validation and test sets will be used for training.
+
+    Args:
+      num_val (int or float): The number of validation samples.
+        If float, it represents the ratio of samples to include in the
+        validation set.
+      num_test (int or float): The number of test samples in case
+        of :obj:`"train_rest"` and :obj:`"random"` split. If float, it
+        represents the ratio of samples to include in the test set.
+    """
+
+    if isinstance(self.node_labels, dict):
+      train_idx = {}
+      val_idx = {}
+      test_idx = {}
+  
+      for node_type, labels in self.node_labels.items():  
+        train_idx[node_type], val_idx[node_type], test_idx[node_type] = \
+          random_split(labels.shape[0], num_val, num_test)
+    else:
+      train_idx, val_idx, test_idx = random_split(self.node_labels.shape[0], num_val, num_test)
+    self.init_node_split((train_idx, val_idx, test_idx))
+  
+  def load_vineyard(
+    self,
+    vineyard_id: str,
+    vineyard_socket: str,
+    edges: List[EdgeType],
+    edge_weights: Dict[EdgeType, str] = None,
+    node_features: Dict[NodeType, List[str]] = None,
+    edge_features: Dict[EdgeType, List[str]] = None,
+    node_labels: Dict[NodeType, str] = None,
+  ):
+    # TODO(hongyi): GPU support
+    is_homo = len(edges) == 1 and edges[0][0] == edges[0][2] 
+    from .vineyard_utils import \
+      vineyard_to_csr, load_vertex_feature_from_vineyard, load_edge_feature_from_vineyard
+
+    _edge_index = {}
+    _edge_ids = {}
+    _edge_weights = {}
+    layout = {}
+    for etype in edges:
+      src_ntype = etype[0] if self.edge_dir == "out" else etype[2]
+      indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, vineyard_id, src_ntype, etype[1], self.edge_dir, True)
+      _edge_index[etype] = (indptr, indices) if self.edge_dir == "out" else (indices, indptr)
+      _edge_ids[etype] = edge_id
+      layout[etype] = "CSR" if self.edge_dir == "out" else "CSC"
+      if edge_weights:
+        etype_edge_weights_label_name = edge_weights.get(etype)
+        if etype_edge_weights_label_name: 
+          _edge_weights[etype] = torch.squeeze(
+            load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, [etype_edge_weights_label_name], etype[1]))
+    if is_homo:
+      ntype = edges[0]
+      _edge_index = _edge_index[ntype]
+      _edge_ids = _edge_ids[ntype]
+      _edge_weights =  _edge_weights.get(ntype)
+      layout = "CSR" if self.edge_dir == "out" else "CSC"
+    self.init_graph(edge_index=_edge_index, edge_ids=_edge_ids, layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
+
+    # load node features
+    if node_features:
+      node_feature_data = {}
+      for ntype, property_names in node_features.items():
+        node_feature_data[ntype] = \
+          load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, property_names, ntype)
+      if is_homo:
+        node_feature_data = node_feature_data[edges[0][0]]
+      self.init_node_features(node_feature_data=node_feature_data, with_gpu=False)
+    
+    # load edge features
+    if edge_features:
+      edge_feature_data = {}
+      if isinstance(edge_features, tuple):
+        edge_features = edge_features[0]
+      for etype, property_names in edge_features.items():
+        edge_feature_data[etype] = \
+          load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, property_names, etype[1])
+      if is_homo:
+        edge_feature_data = edge_feature_data[edges[0]]
+      self.init_edge_features(edge_feature_data=edge_feature_data, with_gpu=False)
+    
+    # load node labels
+    if node_labels:
+      node_label_data = {}
+      for ntype, label_property_name in node_labels.items():
+        node_label_data[ntype] = \
+          load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, [label_property_name], ntype)
+
+      if is_homo:
+        node_label_data = node_label_data[edges[0][0]]
+      self.init_node_labels(node_label_data=node_label_data)
 
   def init_node_features(
     self,
@@ -156,8 +276,9 @@ class Dataset(object):
           if self._directed is None or not self._directed:
             topo_rev = self.graph.topo
           else:
-            row, col, eids = self.graph.topo.to_coo()
-            topo_rev = Topology((col, row), eids, input_layout='COO', layout='CSR' if self.edge_dir == 'out' else 'CSC')
+            row, col, eids, weights = self.graph.topo.to_coo()
+            topo_rev = Topology((col, row), eids, weights, input_layout='COO',
+                              layout='CSR' if self.edge_dir == 'out' else 'CSC')
           node_feature_data, id2idx = \
             sort_func(node_feature_data, split_ratio, topo_rev)
       self.node_features = _build_features(
@@ -222,14 +343,32 @@ class Dataset(object):
     if node_label_data is not None:
       self.node_labels = squeeze(convert_to_tensor(node_label_data))
 
+  def init_node_split(
+    self,
+    node_split: Tuple[NodeIndex, NodeIndex, NodeIndex] = None,
+  ):
+    r"""Initialize the node split.
+
+    Args:
+      node_split (tuple): A tuple containing the train, validation, and test node indices.
+        (default: ``None``)
+    """
+    if node_split is not None:
+      self.train_idx, self.val_idx, self.test_idx = squeeze(convert_to_tensor(node_split))
+
   def share_ipc(self):
     self.node_labels = share_memory(self.node_labels)
-    return self.graph, self.node_features, self.edge_features, self.node_labels, self.edge_dir
+    self.train_idx = share_memory(self.train_idx)
+    self.val_idx = share_memory(self.val_idx)
+    self.test_idx = share_memory(self.test_idx)
+
+    return self.graph, self.node_features, self.edge_features, self.node_labels, \
+        self.edge_dir, (self.train_idx, self.val_idx, self.test_idx)
 
   @classmethod
   def from_ipc_handle(cls, ipc_handle):
-    graph, node_features, edge_features, node_labels, edge_dir = ipc_handle
-    return cls(graph, node_features, edge_features, node_labels, edge_dir)
+    graph, node_features, edge_features, node_labels, edge_dir, node_split  = ipc_handle
+    return cls(graph, node_features, edge_features, node_labels, edge_dir, node_split)
 
   def get_graph(self, etype: Optional[EdgeType] = None):
     if isinstance(self.graph, Graph):
@@ -338,3 +477,16 @@ def reduce_dataset(dataset: Dataset):
   return (rebuild_dataset, (ipc_handle, ))
 
 ForkingPickler.register(Dataset, reduce_dataset)
+
+def random_split(
+  num_total: int,
+  num_val: Union[float, int],
+  num_test: Union[float, int],
+):    
+  num_val = round(num_total * num_val) if isinstance(num_val, float) else num_val
+  num_test = round(num_total * num_test) if isinstance(num_test, float) else num_test
+  perm = torch.randperm(num_total)
+  val_idx = perm[:num_val].clone()
+  test_idx = perm[num_val:num_val + num_test].clone()
+  train_idx = perm[num_val + num_test:].clone()
+  return train_idx, val_idx, test_idx

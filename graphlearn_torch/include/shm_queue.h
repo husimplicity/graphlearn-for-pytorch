@@ -18,6 +18,7 @@ limitations under the License.
 
 #include <functional>
 #include <memory>
+#include <stdexcept>
 
 #ifndef GRAPHLEARN_TORCH_INCLUDE_SHM_QUEUE_H_
 #define GRAPHLEARN_TORCH_INCLUDE_SHM_QUEUE_H_
@@ -205,7 +206,9 @@ public:
 
   /// Dequeue a message on child process.
   /// \return `ShmData`
-  ShmData Dequeue();
+  ShmData Dequeue(unsigned int timeout_ms = 0);
+
+  bool Empty();
 
   /// Pin memory on child processes.
   void PinMemory();
@@ -233,6 +236,11 @@ private:
     void operator()(ShmQueueMeta* meta_ptr);
   };
   std::shared_ptr<ShmQueueMeta> meta_;
+};
+
+class QueueTimeoutError : public std::runtime_error {
+public:
+    QueueTimeoutError() : std::runtime_error("Timeout: Queue is empty.") {}
 };
 
 }  // namespace graphlearn_torch
