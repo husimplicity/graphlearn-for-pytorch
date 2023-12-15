@@ -28,6 +28,8 @@ print("ROOT_PATH: ", ROOT_PATH)
 WITH_VINEYARD = os.getenv('WITH_VINEYARD', 'OFF')
 WITH_CUDA = os.getenv('WITH_CUDA', 'OFF')
 WITH_GART = os.getenv('WITH_GART', 'OFF')
+WITH_GRIN = os.getenv('WITH_GRIN', 'OFF')
+WITH_GAR = os.getenv('WITH_GAR', 'OFF')
 
 extensions = []
 include_dirs=[]
@@ -41,19 +43,25 @@ undef_macros=[]
 include_dirs.append(ROOT_PATH)
 include_dirs.append('/usr/local/cuda' + '/include')
 library_dirs.append('/usr/local/cuda' + 'lib64')
-if WITH_VINEYARD == 'ON':
+if WITH_VINEYARD == 'ON' and WITH_GRIN == 'OFF':
   include_dirs.append('/usr/local/include')
   include_dirs.append('/usr/local/include' + '/glog')
   include_dirs.append('/usr/local/include' + '/gflags')
   include_dirs.append('/usr/local/include' + '/vineyard')
+  include_dirs.append('/usr/local/include' + '/vineyard/basic')
+  include_dirs.append('/usr/local/include' + '/vineyard/graph')
+  include_dirs.append('/usr/local/include' + '/vineyard/io')
+  include_dirs.append('/usr/local/include' + '/vineyard/malloc')
   include_dirs.append('/usr/local/include' + '/vineyard/contrib')
-  include_dirs.append('/home/pai/include')
+  # include_dirs.append('/home/pai/include')
   include_dirs.append(ROOT_PATH + '/third_party')
-  include_dirs.append(ROOT_PATH + '/third_party/grin/storage/v6d')
+  # include_dirs.append(ROOT_PATH + '/third_party/grin/storage/v6d')
   include_dirs.append('/usr/lib/x86_64-linux-gnu/openmpi/include')
 
   library_dirs.append('/usr/local/lib')
-  library_dirs.append('/home/pai/lib')
+  library_dirs.append('/usr/lib')
+  library_dirs.append('/usr/lib/x86_64-linux-gnu/openmpi/lib')
+  # library_dirs.append('/home/pai/lib')
 
   libraries.append('pthread')
   libraries.append('mpi')
@@ -62,6 +70,20 @@ if WITH_VINEYARD == 'ON':
   libraries.append('vineyard_client')
   libraries.append('vineyard_graph')
   libraries.append('vineyard_io')
+  libraries.append('vineyard_malloc')
+  libraries.append('vineyard_internal_registry')
+
+if WITH_VINEYARD == 'ON' and WITH_GRIN == 'ON':
+  include_dirs.append(ROOT_PATH + '/third_party')
+  include_dirs.append(ROOT_PATH + '/third_party/grin')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/include')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/extension')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/extension/include')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/storage/v6d')
+
+  library_dirs.append('/root/grin_hsx/v6d/build/shared-lib')
+  libraries.append('vineyard_grin')
+  libraries.append('vineyard_grin_ext')
 
 if WITH_GART == 'ON':
   # include_dirs.append('/usr/local/include')
@@ -80,6 +102,19 @@ if WITH_GART == 'ON':
   libraries.append('gart_grin')
   # libraries.append('glog')
 
+if WITH_GAR == 'ON':
+  include_dirs.append(ROOT_PATH + '/third_party')
+  include_dirs.append(ROOT_PATH + '/third_party/grin')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/include')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/extension/include')
+  include_dirs.append(ROOT_PATH + '/third_party/grin/storage/GraphAr')
+
+  # update to the path of your grin build
+  library_dirs.append('/root/grin_hsx/GraphAr/build/grin')
+
+  libraries.append('gar-grin')
+  # libraries.append('glog')
+
 
 libraries.append('graphlearn_torch')
 library_dirs.append(ROOT_PATH + '/built/lib')
@@ -89,7 +124,7 @@ extra_cxx_flags.append('-std=gnu++17')
 
 sources = ['graphlearn_torch/python/py_export.cc']
 
-if WITH_GART == 'ON':
+if WITH_GRIN == 'ON':
   sources += glob.glob('graphlearn_torch/csrc/**.cc', recursive=True)
   sources += glob.glob('graphlearn_torch/csrc/cpu/**.cc', recursive=True)
   sources += glob.glob('graphlearn_torch/csrc/cpu/grin/**.cc', recursive=True)
@@ -117,6 +152,16 @@ if WITH_GART == 'ON':
   define_macros.append(('WITH_GART', 'ON'))
 else:
   undef_macros.append(('WITH_GART'))
+
+if WITH_GAR == 'ON':
+  define_macros.append(('WITH_GAR', 'ON'))
+else:
+  undef_macros.append(('WITH_GAR'))
+
+if WITH_GRIN == 'ON':
+  define_macros.append(('WITH_GRIN', 'ON'))
+else:
+  undef_macros.append(('WITH_GRIN'))
 
 if RELEASE == 'TRUE':
   nvcc_flags = ['-O3', '--expt-extended-lambda', '-lnuma',

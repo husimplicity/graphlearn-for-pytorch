@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #ifdef WITH_VINEYARD
+#ifndef WITH_GRIN
 
 #include <torch/extension.h>
 
@@ -39,3 +40,4 @@ torch::Tensor LoadEdgeFeatures(
 );
 
 #endif // WITH_VINEYARD
+#endif

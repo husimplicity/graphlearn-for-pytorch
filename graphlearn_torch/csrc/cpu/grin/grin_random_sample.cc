@@ -18,11 +18,13 @@ limitations under the License.
 #define GRIN_ENABLE_ADJACENT_LIST
 #define GRIN_ASSUME_ALL_VERTEX_LIST_SORTED
 #define GRIN_ENABLE_VERTEX_EXTERNAL_ID_OF_INT64
+#define GRIN_ENABLE_ADJACENT_LIST_ARRAY
 
 #include "graphlearn_torch/csrc/cpu/grin/grin_random_sampler.h"
 #include "grin/extension/include/indexed_adjacent_list.h"
 
 #include "grin/include/index/order.h"
+#include "grin/extension/handle.h"
 // #include "grin/include/topology/adjacentlist.h"
 
 
@@ -58,12 +60,18 @@ void GrinRandomSampler::FillNbrsNum(const int64_t* nodes,
   at::parallel_for(0, bs, 1, [&](int32_t start, int32_t end) {
     for (int32_t i = start; i < end; i++) {
       auto v = nodes[i];
-      if (auto src_idx_adj_list = graph_->GetIndexedAdjList(v);
-          src_idx_adj_list != nullptr) {
-        auto src_degree = grin_get_indexed_adjacent_list_size(graph, src_idx_adj_list);
+      auto cached = graph_->GetIndexedAdjList(v);
+      if (cached) {
+        auto src_degree = grin_get_indexed_adjacent_list_size(graph, *cached);
         out_nbr_num[i] = req_num < src_degree ? (int64_t)req_num : (int64_t)src_degree;
         continue;
       }
+      // if (auto src_idx_adj_list = graph_->GetIndexedAdjList(v);
+      //     src_idx_adj_list != GRIN_NULL_ADJACENT_LIST) {
+      //   auto src_degree = grin_get_indexed_adjacent_list_size(graph, src_idx_adj_list);
+      //   out_nbr_num[i] = req_num < src_degree ? (int64_t)req_num : (int64_t)src_degree;
+      //   continue;
+      // }
 
       auto src = grin_get_vertex_by_external_id_of_int64(graph, v);
       if (src != GRIN_NULL_VERTEX) {
@@ -74,7 +82,6 @@ void GrinRandomSampler::FillNbrsNum(const int64_t* nodes,
         auto src_degree = grin_get_indexed_adjacent_list_size(graph, src_idx_adj_list);
 
         out_nbr_num[i] = req_num < src_degree ? (int64_t)req_num : (int64_t)src_degree;
-        // grin_destroy_indexed_adjacent_list(graph, src_idx_adj_list);
         grin_destroy_adjacent_list(graph, src_adj_list);
         grin_destroy_vertex(graph, src);
       } else {
@@ -100,15 +107,20 @@ void GrinRandomSampler::CSRRowWiseSample(
 
       auto src = grin_get_vertex_by_external_id_of_int64(graph, v);
       if (src != GRIN_NULL_VERTEX) {
-        auto src_idx_adj_list = graph_->GetIndexedAdjList(v);
-        if (src_idx_adj_list == nullptr) {  
+        // auto src_idx_adj_list = graph_->GetIndexedAdjList(v);
+        // auto src_adj_list = grin_get_adjacent_list_by_edge_type(
+        //      graph, GRIN_DIRECTION::OUT, src, etype);
+        GRIN_INDEXED_ADJACENT_LIST src_idx_adj_list;//=grin_get_indexed_adjacent_list(graph, src_adj_list);
+        auto cached = graph_->GetIndexedAdjList(v);
+        if (!cached) {  
           auto src_adj_list = grin_get_adjacent_list_by_edge_type(
             graph, GRIN_DIRECTION::OUT, src, etype);
           src_idx_adj_list = grin_get_indexed_adjacent_list(graph, src_adj_list);
           graph_->SetIndexedAdjList(v, src_idx_adj_list);
           grin_destroy_adjacent_list(graph, src_adj_list);
+        } else {
+          src_idx_adj_list = *cached;
         }
-
         src_degree = grin_get_indexed_adjacent_list_size(graph, src_idx_adj_list);
         // std::cout << "node: " << v << " src degree: " << src_degree << std::endl;
         if (req_num < src_degree) {
@@ -121,7 +133,7 @@ void GrinRandomSampler::CSRRowWiseSample(
               graph, src_idx_adj_list, dist(engine));
             auto out_id = grin_get_vertex_external_id_of_int64(graph, out_v);
             out_nbrs[nbrs_offset[i] + j] = out_id;
-            grin_destroy_vertex(graph, out_v);
+            // grin_destroy_vertex(graph, out_v);
           }
         } else {
           for (int32_t j = 0; j < src_degree; ++j) {
@@ -129,7 +141,7 @@ void GrinRandomSampler::CSRRowWiseSample(
               graph, src_idx_adj_list, j);
             auto out_id = grin_get_vertex_external_id_of_int64(graph, out_v);
             out_nbrs[nbrs_offset[i] + j] = out_id;
-            grin_destroy_vertex(graph, out_v);
+            // grin_destroy_vertex(graph, out_v);
           }
         }
         // grin_destroy_indexed_adjacent_list(graph, src_idx_adj_list);

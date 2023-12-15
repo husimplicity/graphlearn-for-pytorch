@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifdef WITH_VINEYARD
+#if defined(WITH_VINEYARD) && !defined(WITH_GRIN)
 
 #include "graphlearn_torch/include/vineyard_utils.h"
 
