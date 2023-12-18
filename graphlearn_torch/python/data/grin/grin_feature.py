@@ -16,7 +16,7 @@
 from abc import ABC, abstractmethod
 import torch
 from ...utils import convert_to_tensor
-from ... import py_graphlearn_torch as pywrap
+from ... import py_graphlearn_torch_grin as pywrap
 
 class GrinFeature(ABC):
   def __init__(self) -> None:

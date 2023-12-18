@@ -33,18 +33,6 @@ limitations under the License.
 #include "graphlearn_torch/include/stitch_sample_results.h"
 #include "graphlearn_torch/include/types.h"
 
-#ifdef WITH_VINEYARD
-#include "graphlearn_torch/include/grin/grin_graph.h"
-#include "graphlearn_torch/include/grin/grin_feature.h"
-#endif
-
-#ifdef WITH_GRIN
-#include "graphlearn_torch/include/grin/grin_graph.h"
-#include "graphlearn_torch/include/grin/grin_feature.h"
-#include "graphlearn_torch/csrc/cpu/grin/grin_random_sampler.h"
-#include "graphlearn_torch/include/grin/grin_sampler.h"
-#endif
-
 #ifdef WITH_CUDA
 #include "graphlearn_torch/csrc/cuda/inducer.cuh"
 #include "graphlearn_torch/csrc/cuda/random_negative_sampler.cuh"
@@ -62,18 +50,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 #ifdef WITH_CUDA
   m.def("cuda_stitch_sample_results", &CUDAStitchSampleResults);
 #endif
-#if defined(WITH_VINEYARD) && !defined(WITH_GRIN) 
-  m.def("vineyard_to_csr", &ToCSR);
-  m.def("load_vertex_feature_from_vineyard", &LoadVertexFeatures);
-  m.def("load_edge_feature_from_vineyard", &LoadEdgeFeatures);
-#endif
-
-  py::enum_<DataType>(m, "DataType")
-    .value("Int32", DataType::Int32)
-    .value("Int64", DataType::Int64)
-    .value("Float32", DataType::Float32)
-    .value("Float64", DataType::Float64);
-
   py::enum_<GraphMode>(m, "GraphMode")
     .value("DMA", GraphMode::DMA)
     .value("ZERO_COPY", GraphMode::ZERO_COPY);
@@ -97,32 +73,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def("get_edge_count", &Graph::GetEdgeCount)
     .def("get_col_count", &Graph::GetColCount)
     .def("get_mode", &Graph::GetGraphMode);
-  
-  py::class_<GrinGraph>(m, "CppGrinGraph")
-    .def(py::init<const char*, const std::string&>())
-    .def("get_row_count", &GrinGraph::GetRowCount)
-    .def("get_edge_count", &GrinGraph::GetEdgeCount)
-    .def("get_col_count", &GrinGraph::GetColCount)
-    .def("get_src_type_name", &GrinGraph::GetSrcTypeName)
-    .def("get_dst_type_name", &GrinGraph::GetDstTypeName)
-    .def("get_edge_type_name", &GrinGraph::GetEdgeTypeName);
-    
-  py::class_<GrinRandomSampler>(m, "GrinRandomSampler")
-    .def(py::init<GrinGraph*>())
-    .def("sample", &GrinRandomSampler::Sample,
-         py::arg("nodes"), py::arg("req_num"));
-
-  py::class_<GrinVertexFeature>(m, "GrinVertexFeature")
-    .def(py::init<const char*, const std::string&>())
-    .def("cpu_get", &GrinVertexFeature::cpu_get,
-         py::arg("ex_ids"))
-    .def("get_labels", &GrinVertexFeature::get_labels,
-         py::arg("ex_ids"));
-  
-  // py::class_<GrinEdgeFeature>(m, "GrinEdgeFeature")
-  //   .def(py::init<const char*, const std::string&>())
-  //   .def("cpu_get", &GrinEdgeFeature::cpu_get,
-  //        py::arg("ex_ids"));
 
   py::class_<SubGraph>(m, "SubGraph")
     .def(py::init<>())

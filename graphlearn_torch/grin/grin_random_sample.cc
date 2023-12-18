@@ -20,7 +20,7 @@ limitations under the License.
 #define GRIN_ENABLE_VERTEX_EXTERNAL_ID_OF_INT64
 #define GRIN_ENABLE_ADJACENT_LIST_ARRAY
 
-#include "graphlearn_torch/csrc/cpu/grin/grin_random_sampler.h"
+#include "graphlearn_torch/grin/grin_random_sampler.h"
 #include "grin/extension/include/indexed_adjacent_list.h"
 
 #include "grin/include/index/order.h"

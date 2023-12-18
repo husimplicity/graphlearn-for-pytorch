@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from ... import py_graphlearn_torch as pywrap
+from ... import py_graphlearn_torch_grin as pywrap
 
 class GrinGraph:
   def __init__(self, uri: str, edge_type_name: str):

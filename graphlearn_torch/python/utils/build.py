@@ -2,6 +2,106 @@ import os
 
 from torch.utils.cpp_extension import CppExtension
 
+def glt_grin_ext_module(
+  name: str,
+  root_path: str,
+  with_v6d: bool = False, v6d_root_path: str = None,
+  with_gart: bool = False, gart_root_path: str = None,
+  with_gar: bool = False, gar_root_path: str = None,
+):
+  include_dirs=[]
+  library_dirs=[]
+  libraries=[]
+  extra_cxx_flags=[]
+  extra_link_args=[]
+  define_macros=[]
+  undef_macros=[]
+
+  include_dirs.append(root_path)
+  include_dirs.append('/usr/lib/x86_64-linux-gnu/openmpi/include')
+
+  extra_cxx_flags.append('-std=c++17')
+
+  if with_v6d:
+    include_dirs.append(os.path.join(root_path, 'third_party'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/include'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/extension'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/extension/include'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/storage/v6d'))
+
+    library_dirs.append(os.path.join(v6d_root_path, 'build/shared-lib'))
+    libraries.append('vineyard_grin')
+    libraries.append('vineyard_grin_ext')
+
+  if with_gart:
+    include_dirs.append(os.path.join(root_path, 'third_party'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/include'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/extension/include'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/storage/GART'))
+
+    # update to the path of your grin build
+    library_dirs.append(gart_root_path + '/interfaces/grin/build')
+
+    libraries.append('gart_grin')
+
+  if with_gar:
+    include_dirs.append(os.path.join(root_path, 'third_party'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/include'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/extension/include'))
+    include_dirs.append(os.path.join(root_path, 'third_party/grin/storage/GraphAr'))
+
+    # update to the path of your grin build
+    library_dirs.append(gar_root_path + '/build/grin')
+
+    libraries.append('gar-grin')
+
+  libraries.append('graphlearn_torch')
+  library_dirs.append(os.path.join(root_path, 'built/lib'))
+  library_dirs.append('/usr/local/lib')
+  
+  extra_cxx_flags.append('-D_GLIBCXX_USE_CXX11_ABI=0')
+
+  sources = [os.path.join(root_path, 'graphlearn_torch/python/py_export_grin.cc')]
+
+  import glob
+  # sources += glob.glob(os.path.join(root_path, 'graphlearn_torch/csrc/**.cc'), recursive=True)
+  # sources += glob.glob(os.path.join(root_path, 'graphlearn_torch/csrc/cpu/**.cc'), recursive=True)
+  sources += glob.glob(os.path.join(root_path, 'graphlearn_torch/grin/**.cc'), recursive=True)
+
+  if with_v6d:
+    define_macros.append(('WITH_VINEYARD', 'ON'))
+  else:
+    undef_macros.append(('WITH_VINEYARD'))
+
+  if with_gart:
+    define_macros.append(('WITH_GART', 'ON'))
+  else:
+    undef_macros.append(('WITH_GART'))
+
+  if with_gar:
+    define_macros.append(('WITH_GAR', 'ON'))
+  else:
+    undef_macros.append(('WITH_GAR'))
+
+  define_macros.append(('WITH_GRIN', 'ON'))
+
+  return CppExtension(
+    name,
+    sources,
+    extra_link_args=extra_link_args,
+    include_dirs=include_dirs,
+    library_dirs=library_dirs,
+    libraries = libraries,
+    extra_compile_args={
+      'cxx': extra_cxx_flags,
+    },
+    define_macros=define_macros,
+    undef_macros=undef_macros,
+  )
+
 def glt_v6d_ext_module(
   name: str,
   root_path: str,

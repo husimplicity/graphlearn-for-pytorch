@@ -19,6 +19,10 @@ from typing import Dict, Optional, Union, Literal
 import torch
 
 from .. import py_graphlearn_torch as pywrap
+try:
+  from .. import py_graphlearn_torch_grin as grinwrap
+except:
+  pass
 from ..data import Graph
 from ..data.grin import GrinGraph
 from ..typing import NodeType, EdgeType, NumNeighbors, reverse_edge_type
@@ -93,7 +97,7 @@ class NeighborSampler(BaseSampler):
     if self._sampler is None:
       if self._g_cls == 'homo':
         if isinstance(self.graph, GrinGraph):
-          self._sampler = pywrap.GrinRandomSampler(self.graph.graph_handler)
+          self._sampler = grinwrap.GrinRandomSampler(self.graph.graph_handler)
         elif self.device.type == 'cuda':
           self._sampler = pywrap.CUDARandomSampler(self.graph.graph_handler)
         elif self.with_weight == False:
@@ -105,7 +109,7 @@ class NeighborSampler(BaseSampler):
         self._sampler = {}
         for etype, g in self.graph.items():
           if isinstance(g, GrinGraph):
-            self._sampler[etype] = pywrap.GrinRandomSampler(g.graph_handler)
+            self._sampler[etype] = grinwrap.GrinRandomSampler(g.graph_handler)
           elif self.device != torch.device('cpu'):
             self._sampler[etype] = pywrap.CUDARandomSampler(g.graph_handler)
           elif self.with_weight == False:

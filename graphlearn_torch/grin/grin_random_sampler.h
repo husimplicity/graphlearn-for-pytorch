@@ -15,7 +15,7 @@ limitations under the License.
 
 #include <torch/extension.h>
 
-#include "graphlearn_torch/include/grin/grin_sampler.h"
+#include "graphlearn_torch/grin/grin_sampler.h"
 
 
 #ifndef GRAPHLEARN_TORCH_INCLUDE_GRIN_RANDOM_SAMPLER_H_

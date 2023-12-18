@@ -30,7 +30,7 @@ def test(model, test_loader, dataset_name):
     return test_acc
 
 # grindataset = GrinDataset(uri="gart://127.0.0.1:23760?read_epoch=6429&total_partition_num=1&local_partition_num=1&start_partition_id=0&meta_prefix=gart_meta_")
-grindataset = GrinDataset(uri="v6d://38883106316118132?ipc_socket=/tmp/vineyard.sock.1701158638.800426")
+grindataset = GrinDataset(uri="v6d://43202490866923906?ipc_socket=/tmp/vineyard.sock.1702886459.487637")
 grindataset.init_graph(edge_type_name="cites")
 grindataset.init_node_feat(id2idx={"paper": torch.arange(0, 2449029, dtype=torch.int64)})
 #grindataset.init_node_feat({"paper": "features"})

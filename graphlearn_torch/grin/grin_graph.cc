@@ -13,4 +13,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "graphlearn_torch/include/grin/grin_graph.h"
+#include "graphlearn_torch/grin/grin_graph.h"

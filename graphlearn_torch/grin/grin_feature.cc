@@ -21,7 +21,7 @@ limitations under the License.
 #define GRIN_ENABLE_ADJACENT_LIST_ARRAY
 #define GRIN_ENABLE_VERTEX_EXTERNAL_ID_OF_INT64
 
-#include "graphlearn_torch/include/grin/grin_feature.h"
+#include "graphlearn_torch/grin/grin_feature.h"
 
 #include "grin/include/index/external_id.h"
 #include "grin/include/property/property.h"
