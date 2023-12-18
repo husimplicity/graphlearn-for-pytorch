@@ -67,8 +67,6 @@ def glt_grin_ext_module(
   sources = [os.path.join(root_path, 'graphlearn_torch/python/py_export_grin.cc')]
 
   import glob
-  # sources += glob.glob(os.path.join(root_path, 'graphlearn_torch/csrc/**.cc'), recursive=True)
-  # sources += glob.glob(os.path.join(root_path, 'graphlearn_torch/csrc/cpu/**.cc'), recursive=True)
   sources += glob.glob(os.path.join(root_path, 'graphlearn_torch/grin/**.cc'), recursive=True)
 
   if with_v6d:

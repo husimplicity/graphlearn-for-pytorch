@@ -25,11 +25,10 @@ limitations under the License.
 
 #include "grin/include/index/order.h"
 #include "grin/extension/handle.h"
-// #include "grin/include/topology/adjacentlist.h"
-
 
 #include <cstdint>
 #include <random>
+
 
 std::tuple<torch::Tensor, torch::Tensor> 
 GrinRandomSampler::Sample(const torch::Tensor& nodes, int32_t req_num) {
@@ -107,10 +106,7 @@ void GrinRandomSampler::CSRRowWiseSample(
 
       auto src = grin_get_vertex_by_external_id_of_int64(graph, v);
       if (src != GRIN_NULL_VERTEX) {
-        // auto src_idx_adj_list = graph_->GetIndexedAdjList(v);
-        // auto src_adj_list = grin_get_adjacent_list_by_edge_type(
-        //      graph, GRIN_DIRECTION::OUT, src, etype);
-        GRIN_INDEXED_ADJACENT_LIST src_idx_adj_list;//=grin_get_indexed_adjacent_list(graph, src_adj_list);
+        GRIN_INDEXED_ADJACENT_LIST src_idx_adj_list;
         auto cached = graph_->GetIndexedAdjList(v);
         if (!cached) {  
           auto src_adj_list = grin_get_adjacent_list_by_edge_type(
@@ -122,7 +118,6 @@ void GrinRandomSampler::CSRRowWiseSample(
           src_idx_adj_list = *cached;
         }
         src_degree = grin_get_indexed_adjacent_list_size(graph, src_idx_adj_list);
-        // std::cout << "node: " << v << " src degree: " << src_degree << std::endl;
         if (req_num < src_degree) {
           thread_local static std::random_device rd;
           thread_local static std::mt19937 engine(rd());
@@ -133,7 +128,6 @@ void GrinRandomSampler::CSRRowWiseSample(
               graph, src_idx_adj_list, dist(engine));
             auto out_id = grin_get_vertex_external_id_of_int64(graph, out_v);
             out_nbrs[nbrs_offset[i] + j] = out_id;
-            // grin_destroy_vertex(graph, out_v);
           }
         } else {
           for (int32_t j = 0; j < src_degree; ++j) {
@@ -141,10 +135,8 @@ void GrinRandomSampler::CSRRowWiseSample(
               graph, src_idx_adj_list, j);
             auto out_id = grin_get_vertex_external_id_of_int64(graph, out_v);
             out_nbrs[nbrs_offset[i] + j] = out_id;
-            // grin_destroy_vertex(graph, out_v);
           }
         }
-        // grin_destroy_indexed_adjacent_list(graph, src_idx_adj_list);
         grin_destroy_vertex(graph, src);
       }
     }
